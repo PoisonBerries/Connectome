@@ -101,7 +101,8 @@ for i in list(range(16)) + [100, 400]:
     print(f"#{i+1:<4} {(EPOCH_OUT+dt.timedelta(days=i)).strftime('%a')}  {p['start']:>14} -> {p['target']:<14} par {p['par']}  agent {p['agent']:>2}  [{p['sl']} / {p['tl']}]")
 
 # ------------------------------------------------------------------ ship
-out_graph = dict(w=words, k=[int(x) for x in kinds], n=[int(x) for x in nb.ravel()])
+out_graph = dict(w=words, k=[int(x) for x in kinds], n=[int(x) for x in nb.ravel()],
+                 e=[int(x) for x in pool])  # well-known endpoint words: the pool endless mode draws from
 with open(os.path.join(WEB, "graph.json"), "w") as f:
     json.dump(out_graph, f, separators=(",", ":"))
 out_p = dict(epoch=EPOCH_OUT.isoformat(),

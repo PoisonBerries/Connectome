@@ -5,7 +5,8 @@ import { Ambient } from './ambient.js';
 import { drawConstellation } from './map.js';
 import { shareText, shareOrCopy, copyText } from './share.js';
 import { sound, haptic } from './sound.js';
-import { settings as settingsStore, saves, stats as statsStore, TIERS, tierIndex } from './store.js';
+import { settings as settingsStore, saves, stats as statsStore, endless as endlessStore, TIERS, tierIndex } from './store.js';
+import { EndlessRun, parForRound, BUDGET_MULT } from './endless.js';
 import { hydrateIcons } from './icons.js';
 
 const $ = (id) => document.getElementById(id);
@@ -21,6 +22,10 @@ const state = {
   lastTier: null,
   map: null,
   cal: null,
+  mode: 'daily', // 'daily' | 'endless'
+  run: null, // EndlessRun while in endless mode
+  dailyNum: 1, // the daily puzzle to return to
+  endlessResult: null,
 };
 
 // ------------------------------------------------------------------ boot
@@ -88,27 +93,55 @@ function loadPuzzle(num, { push = true } = {}) {
   state.game = new Game(world, puzzle, saves.load(num));
   state.compass = null;
   state.lastTier = null;
+  state.dailyNum = num;
+  state.mode = 'daily';
+  state.run = null;
 
   if (push) {
     const url = new URL(location.href);
     num === state.today ? url.searchParams.delete('p') : url.searchParams.set('p', num);
     history.replaceState(null, '', url);
   }
-
-  const date = dateOfPuzzle(world, num);
-  $('meta-num').textContent = `Puzzle #${num}`;
-  $('meta-date').textContent = date.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
-  $('from-word').textContent = world.words[puzzle.start];
-  $('to-word').textContent = world.words[puzzle.target];
-  $('from-sub').textContent = puzzle.startLabel || '';
-  $('to-sub').textContent = puzzle.targetLabel || '';
-  $('par-count').textContent = puzzle.par;
   document.title = `Connectome #${num} — the daily word-wiring game`;
+  paintMode();
+  paintMission();
+  render({ animate: false });
+}
 
-  const g = state.game;
+/** Everything that depends on which mode (and which round/puzzle) we're in. */
+function paintMode() {
+  const endless = state.mode === 'endless';
+  $('modes').dataset.mode = state.mode;
+  $('mode-daily').setAttribute('aria-selected', String(!endless));
+  $('mode-endless').setAttribute('aria-selected', String(endless));
+  document.body.dataset.mode = state.mode;
+  $('btn-giveup').querySelector('span').textContent = endless ? 'Quit' : 'Reveal';
+  $('hop-label').textContent = endless ? 'left' : 'hops';
+  if (endless) {
+    const best = endlessStore.stats().best;
+    $('meta-num').textContent = `Endless ∞ · Round ${state.run.round}`;
+    $('meta-date').textContent = `${state.run.links} linked · best ${best}`;
+    document.title = 'Connectome ∞ — endless mode';
+  } else {
+    const date = dateOfPuzzle(state.world, state.game.puzzle.num);
+    $('meta-num').textContent = `Puzzle #${state.game.puzzle.num}`;
+    $('meta-date').textContent = date.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+  }
+}
+
+function paintMission() {
+  const { world, game: g } = state;
+  const p = g.puzzle;
+  $('from-word').textContent = world.words[p.start];
+  $('to-word').textContent = world.words[p.target];
+  $('from-sub').textContent = p.startLabel || '';
+  $('to-sub').textContent = p.targetLabel || '';
+  $('par-line').innerHTML =
+    state.mode === 'endless'
+      ? `of <b id="par-count">${state.run.budget}</b><span class="sep">·</span>par ${p.par}`
+      : `par <b id="par-count">${p.par}</b>`;
   $('gateways').hidden = !g.gatewaysShown;
   if (g.gatewaysShown) fillGateways();
-  render({ animate: false });
 }
 
 // ------------------------------------------------------------------ rendering
@@ -117,7 +150,7 @@ function view() {
   const g = state.game;
   return {
     current: g.current,
-    options: g.over ? [] : g.options,
+    options: frozen() ? [] : g.options,
     target: g.puzzle.target,
     visited: g.visited,
     words: state.world.words,
@@ -133,24 +166,40 @@ function render({ animate = true, from = null } = {}) {
   announce();
 }
 
+/** Nothing more can be played (round celebrating, or the run has ended). */
+function frozen() {
+  return state.game.over || (state.mode === 'endless' && state.run.over);
+}
+
+/** The controls give way to the "See results" button. */
+function finished() {
+  return state.mode === 'endless' ? state.run.over : state.game.over;
+}
+
 function renderHud() {
   const g = state.game;
+  const endless = state.mode === 'endless';
+  const done = finished();
   const badge = $('hop-count');
-  if (badge.textContent !== String(g.score)) {
-    badge.textContent = g.score;
+  const shown = endless ? state.run.left : g.score;
+  if (badge.textContent !== String(shown)) {
+    badge.textContent = shown;
     const box = badge.parentElement;
     box.classList.remove('bump');
     void box.offsetWidth;
     box.classList.add('bump');
   }
-  $('btn-undo').disabled = !g.canUndo();
-  $('btn-hint').disabled = g.over;
-  $('btn-giveup').disabled = g.over;
-  $('btn-hint').classList.toggle('on', g.hintsUsed > 0 && !g.over);
+  $('hops-badge').classList.toggle('low', endless && !done && state.run.left <= 3);
+  $('btn-undo').disabled = frozen() || !g.canUndo();
+  $('btn-hint').disabled = frozen();
+  $('btn-giveup').disabled = frozen();
+  $('btn-hint').classList.toggle('on', g.hintsUsed > 0 && !done);
   $('btn-hint').querySelector('span').textContent = g.hintsUsed ? `Hint · ${g.hintsUsed}` : 'Hint';
-  document.querySelector('.controls').classList.toggle('over', g.over);
-  $('btn-results').hidden = !g.over;
-  for (const id of ['btn-undo', 'btn-hint', 'btn-map', 'btn-giveup']) $(id).hidden = g.over;
+  document.querySelector('.controls').classList.toggle('over', done);
+  $('btn-results').hidden = !done;
+  for (const id of ['btn-undo', 'btn-hint', 'btn-map', 'btn-giveup']) $(id).hidden = done;
+  // gently point finished daily players at endless mode until they've tried it
+  $('modes').classList.toggle('nudge', !endless && g.over && !state.settings.seenEndless);
 }
 
 function renderTrail() {
@@ -196,14 +245,16 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 // ------------------------------------------------------------------ actions
 
 function persist() {
-  saves.save(state.game.puzzle.num, state.game.serialize());
+  if (state.mode === 'endless') endlessStore.saveRun(state.run.serialize());
+  else saves.save(state.game.puzzle.num, state.game.serialize());
 }
 
 function pick(id) {
+  if (frozen()) return;
   const g = state.game;
-  if (g.over) return;
-  const rec = g.hop(id);
-  if (!rec) return;
+  const res = state.mode === 'endless' ? state.run.hop(id) : (() => { const rec = g.hop(id); return rec && { rec, won: g.status === 'won' }; })();
+  if (!res) return;
+  const rec = res.rec;
   state.compass = null;
   persist();
 
@@ -212,7 +263,10 @@ function pick(id) {
   haptic(8);
 
   render();
-  if (g.status === 'won') celebrate();
+  if (state.mode === 'endless') {
+    if (res.won) roundWon();
+    else if (res.lost) runOver();
+  } else if (res.won) celebrate();
 }
 
 function celebrate() {
@@ -228,7 +282,7 @@ function celebrate() {
 
 function undo() {
   const g = state.game;
-  if (!g.canUndo()) return;
+  if (frozen() || !g.canUndo()) return;
   const from = state.stage.centerOf(g.current);
   g.undo();
   state.compass = null;
@@ -239,6 +293,7 @@ function undo() {
 
 function jumpTo(i) {
   const g = state.game;
+  if (frozen()) return;
   const from = state.stage.centerOf(g.current);
   if (!g.jumpTo(i)) return;
   state.compass = null;
@@ -247,33 +302,45 @@ function jumpTo(i) {
   render({ from });
 }
 
+/** In endless mode hints spend moves, and can't spend the last one. */
+function affordable(cost) {
+  if (state.mode !== 'endless' || state.run.canAfford(cost)) return true;
+  toast('Not enough moves left for that hint');
+  return false;
+}
+
 function useGateways() {
   const g = state.game;
-  if (g.over) return;
+  if (frozen()) return;
   const first = !g.gatewaysShown;
+  if (first && !affordable(GATEWAY_COST)) return;
   g.showGateways();
   fillGateways();
   $('gateways').hidden = false;
   persist();
   sound.hint();
   renderHud();
-  toast(first ? `Gateways revealed · +${GATEWAY_COST} hop` : 'Gateways are already showing');
+  toast(first ? `Gateways revealed · ${state.mode === 'endless' ? '−' : '+'}${GATEWAY_COST} ${state.mode === 'endless' ? 'move' : 'hop'}` : 'Gateways are already showing');
 }
 
 function useCompass() {
   const g = state.game;
-  if (g.over) return;
+  if (frozen() || !affordable(COMPASS_COST)) return;
   const ids = new Set(g.compass());
   state.compass = { node: g.current, ids };
   persist();
   sound.hint();
   render({ animate: false });
-  toast(`Compass on · +${COMPASS_COST} hops`);
+  toast(`Compass on · ${state.mode === 'endless' ? '−' : '+'}${COMPASS_COST} ${state.mode === 'endless' ? 'moves' : 'hops'}`);
 }
 
 function giveUp() {
   const g = state.game;
-  if (g.over) return;
+  if (frozen()) return;
+  if (state.mode === 'endless') {
+    state.run.quit();
+    return runOver();
+  }
   g.giveUp();
   persist();
   sound.lose();
@@ -292,6 +359,95 @@ function finish({ show = true } = {}) {
   }
   state.lastTier = tier;
   if (show) openResult();
+}
+
+// ------------------------------------------------------------------ endless mode
+
+function enterEndless() {
+  closeAllDialogs();
+  state.map?.stop();
+  state.run = new EndlessRun(state.world, { saved: endlessStore.run() });
+  state.mode = 'endless';
+  state.game = state.run.game;
+  state.compass = null;
+  state.endlessResult = null;
+  persist();
+  paintMode();
+  paintMission();
+  render({ animate: false });
+  if (!state.settings.seenEndless) {
+    saveSettings({ seenEndless: true });
+    setTimeout(() => openDialog('dlg-endless-intro'), 250);
+  }
+}
+
+function newEndlessRun() {
+  endlessStore.clearRun();
+  enterEndless();
+}
+
+function backToDaily() {
+  closeAllDialogs();
+  loadPuzzle(state.dailyNum, { push: false });
+  if (state.game.over) setTimeout(() => finish({ show: true }), 250);
+}
+
+/** Target reached: celebrate, then it becomes the next start word and a fresh target is rolled. */
+function roundWon() {
+  const { run, stage } = state;
+  sound.win();
+  haptic(30);
+  toast(`Linked! ${run.links} in the chain`);
+  setTimeout(() => {
+    if (state.run !== run) return;
+    const p = stage.centerOf(run.game.puzzle.target);
+    stage.burst(p.x, p.y);
+  }, 250);
+  setTimeout(() => {
+    if (state.run !== run || state.mode !== 'endless' || run.over) return;
+    run.advance();
+    state.game = run.game;
+    state.compass = null;
+    persist();
+    paintMode();
+    paintMission();
+    render({ animate: true });
+  }, 1150);
+}
+
+function runOver() {
+  const { run } = state;
+  sound.lose();
+  haptic(40);
+  state.endlessResult = endlessStore.record(run.links, run.totalHops);
+  endlessStore.clearRun();
+  render({ animate: false });
+  paintMode();
+  setTimeout(() => state.run === run && openEndlessOver(), 900);
+}
+
+function openEndlessOver() {
+  const { run, world } = state;
+  const { stats, newBest } = state.endlessResult || { stats: endlessStore.stats(), newBest: false };
+  const w = world.words;
+  $('eo-emoji').textContent = newBest && run.links > 0 ? '🏆' : '🔗';
+  $('eo-title').textContent = run.links === 0 ? 'Chain broken' : newBest ? 'New best!' : run.reason === 'quit' ? 'Run ended' : 'Out of moves';
+  $('eo-sub').textContent =
+    run.reason === 'quit'
+      ? `You chained ${run.links} ${run.links === 1 ? 'link' : 'links'}.`
+      : `You chained ${run.links} ${run.links === 1 ? 'link' : 'links'}, then ran out of moves reaching ${w[run.missed]}.`;
+  $('eo-stats').innerHTML = [['Links', run.links], ['Best', stats.best], ['Hops', run.totalHops]]
+    .map(([l, v]) => `<div class="stat"><b>${v}</b><small>${l}</small></div>`).join('');
+  $('eo-chain').innerHTML =
+    run.chain.map((id, i) => `<span class="chip${i === 0 ? ' first' : ''}">${esc(w[id])}</span>`).join('<span class="arr">→</span>') +
+    (run.missed != null ? `<span class="arr">→</span><span class="chip miss">${esc(w[run.missed])}</span>` : '');
+  const topPar = run.links ? parForRound(run.links) : 0;
+  $('eo-share').textContent = [
+    `Connectome ∞ 🔗×${run.links}${newBest && run.links ? ' 🏆' : ''}`,
+    run.links ? `Chained ${run.links} ${run.links === 1 ? 'word' : 'words'} · up to par ${topPar} · ${run.totalHops} hops` : 'Broke the chain on the first link',
+    location.origin && location.origin !== 'null' ? location.origin + location.pathname : '',
+  ].filter(Boolean).join('\n');
+  openDialog('dlg-endless-over');
 }
 
 // ------------------------------------------------------------------ dialogs
@@ -462,8 +618,26 @@ function wireEvents() {
     openDialog('dlg-hint');
   };
   $('btn-map').onclick = openMap;
-  $('btn-giveup').onclick = () => openDialog('dlg-giveup');
-  $('btn-results').onclick = () => finish({ show: true });
+  $('btn-giveup').onclick = () => {
+    const endless = state.mode === 'endless';
+    $('giveup-title').textContent = endless ? 'End this run?' : 'Reveal the shortest path?';
+    $('giveup-msg').textContent = endless ? `You've chained ${state.run.links}. Ending now locks that in.` : "This ends the puzzle and won't count as a win.";
+    $('giveup-yes').textContent = endless ? 'End run' : 'Reveal it';
+    openDialog('dlg-giveup');
+  };
+  $('btn-results').onclick = () => (state.mode === 'endless' ? openEndlessOver() : finish({ show: true }));
+
+  $('mode-daily').onclick = () => state.mode !== 'daily' && backToDaily();
+  $('mode-endless').onclick = () => state.mode !== 'endless' && enterEndless();
+  $('btn-to-endless').onclick = enterEndless;
+  $('ei-go').onclick = () => $('dlg-endless-intro').close();
+  $('eo-again').onclick = newEndlessRun;
+  $('eo-daily').onclick = backToDaily;
+  $('eo-share-btn').onclick = async () => {
+    const r = await shareOrCopy($('eo-share').textContent);
+    if (r === 'copied') toast('Copied to clipboard');
+    else if (r === 'failed') toast("Couldn't copy. Select the text instead.");
+  };
 
   $('help-go').onclick = () => {
     $('dlg-help').close();
@@ -530,16 +704,16 @@ function wireEvents() {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     if (document.querySelector('dialog[open]')) return;
     const g = state.game;
-    if (/^[1-5]$/.test(e.key) && !g.over) {
+    if (/^[1-5]$/.test(e.key) && !frozen()) {
       const id = g.options[Number(e.key) - 1];
       const el = state.stage.optionEl(id);
       if (el && !el.classList.contains('locked')) pick(id);
     } else if (e.key === 'Backspace' || e.key.toLowerCase() === 'z' || e.key.toLowerCase() === 'u') {
       e.preventDefault();
       undo();
-    } else if (e.key.toLowerCase() === 'h' && !g.over) {
+    } else if (e.key.toLowerCase() === 'h' && !frozen()) {
       $('btn-hint').click();
-    } else if (e.key.toLowerCase() === 'm' && !g.over) {
+    } else if (e.key.toLowerCase() === 'm' && !frozen()) {
       openMap();
     } else if (e.key === '?') {
       openDialog('dlg-help');

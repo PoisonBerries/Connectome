@@ -65,3 +65,62 @@ assert.equal(tierIndex(8, 5), 1); assert.equal(tierIndex(12, 8), 1); assert.equa
 
 console.log('date of #1:', dateOfPuzzle(w, 1).toDateString(), '| today is #', todayNumber(w));
 console.log('all game logic checks passed');
+
+// ---- endless mode
+{
+  const { EndlessRun, parForRound, BUDGET_MULT } = await import('../web/js/endless.js');
+  assert.deepEqual([1, 2, 3, 4, 5, 6, 9, 10, 20].map(parForRound), [4, 4, 5, 5, 6, 6, 8, 8, 8]);
+
+  // deterministic RNG so the test is reproducible
+  let seed = 7;
+  const rand = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+  const run = new EndlessRun(w, { rand });
+  let prevTarget = null;
+  for (let r = 1; r <= 12; r++) {
+    const pz = run.game.puzzle;
+    if (prevTarget !== null) assert.equal(pz.start, prevTarget, 'target becomes next start');
+    assert(pz.par >= 3 && pz.par <= 9, 'par in range');
+    assert.equal(run.budget, BUDGET_MULT * pz.par);
+    assert.equal(run.left, run.budget);
+    const route = w.shortestPath(pz.start, pz.target);
+    let res;
+    for (const step of route.slice(1)) res = run.hop(step);
+    assert(res.won && !run.over, `round ${r} should be won`);
+    prevTarget = pz.target;
+    assert(run.advance());
+  }
+  assert.equal(run.links, 12);
+  assert.equal(new Set(run.chain).size, run.chain.length, 'no word repeats in a chain');
+
+  // run out of moves: wander until the budget is gone
+  const lost = new EndlessRun(w, { rand });
+  const budget = lost.budget;
+  let result = null;
+  for (let i = 0; i < budget + 5 && !lost.over; i++) {
+    const opts = lost.game.options;
+    const bad = opts.find((o) => lost.game.dist[o] >= lost.game.dist[lost.game.current] && o !== lost.game.puzzle.target) ?? opts[0];
+    result = lost.hop(bad);
+    if (!lost.over && lost.game.status === 'won') break;
+    if (!lost.over) lost.game.undo(); // walking back is free; only forward hops burn moves
+  }
+  assert(lost.over && lost.reason === 'out' && result.lost, 'runs end when moves run out');
+  assert.equal(lost.hop(lost.game.options[0]), null, 'no moves after the run ends');
+
+  // hints spend moves and can't take the last one
+  const h = new EndlessRun(w, { rand });
+  assert(h.canAfford(2));
+  h.game.compass(); h.game.compass();
+  const spent = h.left;
+  assert.equal(spent, h.budget - 4);
+  assert(!h.canAfford(spent), 'a hint may not consume the final move');
+
+  // save / restore, including mid-celebration
+  const a = new EndlessRun(w, { rand });
+  const route = w.shortestPath(a.game.puzzle.start, a.game.puzzle.target);
+  for (const step of route.slice(1)) a.hop(step);
+  const b = new EndlessRun(w, { saved: JSON.parse(JSON.stringify(a.serialize())) });
+  assert.equal(b.round, 2, 'restoring a just-won round moves on to the next');
+  assert.equal(b.game.puzzle.start, a.game.puzzle.target);
+  assert.equal(b.links, 1);
+  console.log('endless mode checks passed');
+}

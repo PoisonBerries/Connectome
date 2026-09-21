@@ -13,6 +13,7 @@ export async function loadData() {
 export class World {
   constructor(g, p) {
     this.words = g.w;
+    this.pool = g.e || g.w.map((_, i) => i); // well-known words that make good puzzle endpoints
     this.kinds = g.k; // 0 word, 1 proper noun, 2 phrase
     this.out = Int32Array.from(g.n);
     this.N = this.words.length;
@@ -49,6 +50,23 @@ export class World {
       }
     }
     this._dist.set(target, d);
+    return d;
+  }
+
+  /** Directed distance from `start` to every node (Int16Array, -1 = unreachable). */
+  forwardDist(start) {
+    const d = new Int16Array(this.N).fill(-1);
+    d[start] = 0;
+    const q = [start];
+    for (let h = 0; h < q.length; h++) {
+      const u = q[h];
+      for (const v of this.neighbors(u)) {
+        if (d[v] < 0) {
+          d[v] = d[u] + 1;
+          q.push(v);
+        }
+      }
+    }
     return d;
   }
 

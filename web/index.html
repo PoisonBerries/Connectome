@@ -44,6 +44,12 @@
     </header>
 
     <main>
+      <div class="modes" id="modes" role="tablist" aria-label="Game mode">
+        <button role="tab" id="mode-daily" aria-selected="true">Daily</button>
+        <button role="tab" id="mode-endless" aria-selected="false">Endless <span aria-hidden="true">∞</span></button>
+        <span class="thumb" aria-hidden="true"></span>
+      </div>
+
       <p class="puzzle-meta" id="puzzle-meta"><span id="meta-num"></span><i></i><span id="meta-date"></span></p>
 
       <section class="mission" aria-label="Your mission">
@@ -53,8 +59,8 @@
           <span class="sub" id="from-sub"></span>
         </div>
         <div class="link" aria-live="polite">
-          <div class="hops"><span id="hop-count">0</span><small>hops</small></div>
-          <div class="par">par <b id="par-count">–</b></div>
+          <div class="hops" id="hops-badge"><span id="hop-count">0</span><small id="hop-label">hops</small></div>
+          <div class="par" id="par-line">par <b id="par-count">–</b></div>
         </div>
         <div class="endpoint to">
           <span class="tag">To</span>
@@ -191,7 +197,7 @@
   <!-- Give up -->
   <dialog id="dlg-giveup" class="sheet" aria-labelledby="giveup-title">
     <h2 id="giveup-title">Reveal the shortest path?</h2>
-    <p class="lede">This ends the puzzle and won't count as a win.</p>
+    <p class="lede" id="giveup-msg">This ends the puzzle and won't count as a win.</p>
     <div class="row">
       <button class="btn" id="giveup-no">Keep wiring</button>
       <button class="btn danger" id="giveup-yes">Reveal it</button>
@@ -214,8 +220,42 @@
     <canvas class="constellation" id="res-canvas"></canvas>
     <details class="route" id="res-route"><summary>The shortest route</summary><div id="res-route-body"></div></details>
     <pre class="share-preview" id="share-preview"></pre>
+    <button class="btn wide endless-cta" id="btn-to-endless"><span>Keep going: Endless mode <b>∞</b></span></button>
     <div class="res-mini" id="res-mini"></div>
     <div class="next" id="res-next"></div>
+  </dialog>
+
+
+  <!-- Endless intro -->
+  <dialog id="dlg-endless-intro" aria-labelledby="ei-title">
+    <form method="dialog" class="dlg-close"><button class="icon-btn" data-icon="close" aria-label="Close"></button></form>
+    <h2 id="ei-title">Endless mode <span class="inf">∞</span></h2>
+    <p class="lede">How long can you keep the chain going?</p>
+    <ol class="steps">
+      <li><b>You get 3× par in moves</b> to wire your way to a random target.</li>
+      <li><b>Reach it and it becomes your new start.</b> A fresh target is rolled and your moves reset.</li>
+      <li><b>Run out of moves and the run ends.</b> Your score is how many links you chained.</li>
+      <li><b>It gets harder.</b> Routes start short and grow longer as the chain grows. Hints cost moves.</li>
+    </ol>
+    <button class="btn primary" id="ei-go">Start chaining</button>
+  </dialog>
+
+  <!-- Endless run over -->
+  <dialog id="dlg-endless-over" aria-labelledby="eo-title">
+    <form method="dialog" class="dlg-close"><button class="icon-btn" data-icon="close" aria-label="Close"></button></form>
+    <div class="res-head">
+      <div class="res-emoji" id="eo-emoji">🔗</div>
+      <h2 id="eo-title"></h2>
+      <p class="lede" id="eo-sub"></p>
+    </div>
+    <div class="res-stats" id="eo-stats"></div>
+    <div class="chain" id="eo-chain" aria-label="Your chain"></div>
+    <pre class="share-preview" id="eo-share"></pre>
+    <div class="row">
+      <button class="btn primary" id="eo-share-btn" data-icon="share"><span>Share</span></button>
+      <button class="btn" id="eo-again"><span>Play again</span></button>
+    </div>
+    <button class="btn wide" id="eo-daily" style="margin-top:10px">Back to the daily</button>
   </dialog>
 
   <div class="toasts" id="toasts" aria-live="polite"></div>

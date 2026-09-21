@@ -20,7 +20,7 @@ function write(key, value) {
 }
 
 export const settings = {
-  defaults: { theme: 'auto', sound: false, motion: true, seenHelp: false },
+  defaults: { theme: 'auto', sound: false, motion: true, seenHelp: false, seenEndless: false },
   load() {
     return { ...this.defaults, ...read('settings', {}) };
   },
@@ -99,5 +99,39 @@ export const stats = {
     }
     this.save(s);
     return s;
+  },
+};
+
+/** Endless mode: the in-progress run plus lifetime bests. */
+export const endless = {
+  emptyStats: () => ({ best: 0, bestHops: 0, runs: 0, links: 0 }),
+  stats() {
+    return { ...this.emptyStats(), ...read('endless:stats', {}) };
+  },
+  run() {
+    return read('endless:run', null);
+  },
+  saveRun(run) {
+    write('endless:run', run);
+  },
+  clearRun() {
+    try {
+      localStorage.removeItem(NS + 'endless:run');
+    } catch {
+      /* ignore */
+    }
+  },
+  /** Record a finished run and return the updated stats (plus whether it set a new best). */
+  record(links, hops) {
+    const s = this.stats();
+    const newBest = links > s.best;
+    s.runs += 1;
+    s.links += links;
+    if (newBest) {
+      s.best = links;
+      s.bestHops = hops;
+    }
+    write('endless:stats', s);
+    return { stats: s, newBest };
   },
 };
