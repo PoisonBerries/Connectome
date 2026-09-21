@@ -421,6 +421,7 @@ function runOver() {
   haptic(40);
   state.endlessResult = endlessStore.record(run.links, run.totalHops);
   endlessStore.clearRun();
+  if (!run.game.over) run.game.giveUp(); // reveals the shortest route from where you stopped
   render({ animate: false });
   paintMode();
   setTimeout(() => state.run === run && openEndlessOver(), 900);
@@ -447,7 +448,13 @@ function openEndlessOver() {
     run.links ? `Chained ${run.links} ${run.links === 1 ? 'word' : 'words'} · up to par ${topPar} · ${run.totalHops} hops` : 'Broke the chain on the first link',
     location.origin && location.origin !== 'null' ? location.origin + location.pathname : '',
   ].filter(Boolean).join('\n');
+  const p = run.game.puzzle;
+  const route = world.shortestPath(p.start, p.target) || [];
+  $('eo-route').querySelector('summary').textContent = `The shortest route (${route.length - 1} hops)`;
+  $('eo-route-body').innerHTML = `<div class="path-words">${route.map((id) => esc(w[id])).join(' <i>→</i> ')}</div>`;
   openDialog('dlg-endless-over');
+  state.map?.stop();
+  requestAnimationFrame(() => (state.map = drawConstellation($('eo-canvas'), world, run.game, { animate: state.settings.motion })));
 }
 
 // ------------------------------------------------------------------ dialogs
@@ -696,7 +703,7 @@ function wireEvents() {
       if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) d.close();
     });
     d.addEventListener('close', () => {
-      if (d.id === 'dlg-map' || d.id === 'dlg-result') state.map?.stop();
+      if (d.id === 'dlg-map' || d.id === 'dlg-result' || d.id === 'dlg-endless-over') state.map?.stop();
     });
   });
 
