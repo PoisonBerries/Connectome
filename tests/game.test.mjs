@@ -149,3 +149,42 @@ console.log('all game logic checks passed');
   assert.equal(b.links, 1);
   console.log('endless mode checks passed');
 }
+
+// ---- saves survive a rebuilt graph (node ids reshuffled, words unchanged)
+{
+  const N = g.w.length;
+  const order = Array.from({ length: N }, (_, i) => i).sort((a, b) => ((a * 7919) % 10007) - ((b * 7919) % 10007)); // deterministic shuffle
+  const newId = new Array(N);
+  order.forEach((old, ni) => (newId[old] = ni));
+  const g2 = {
+    w: order.map((old) => g.w[old]),
+    k: order.map((old) => g.k[old]),
+    n: order.flatMap((old) => g.n.slice(old * 5, old * 5 + 5).map((x) => newId[x])),
+    e: g.e.map((x) => newId[x]),
+  };
+  const w2 = new World(g2, p);
+  assert.notEqual(w2.index.get('Paris'), w.index.get('Paris'), 'ids really did change');
+
+  const pzA = w.puzzleFor(3);
+  const gameA = new Game(w, pzA);
+  gameA.hop(gameA.options[0]); gameA.hop(gameA.options[1]);
+  gameA.compass();
+  const saved = JSON.parse(JSON.stringify(gameA.serialize()));
+
+  const gameB = new Game(w2, w2.puzzleFor(3), saved);
+  const names = (world, game) => game.path.map((i) => world.words[i]);
+  assert.deepEqual(names(w2, gameB), names(w, gameA), 'path restored by words');
+  assert.equal(gameB.score, gameA.score, 'score restored');
+
+  const { EndlessRun } = await import('../web/js/endless.js');
+  const run = new EndlessRun(w, { rand: () => 0.42 });
+  run.hop(run.game.options[0]);
+  const run2 = new EndlessRun(w2, { saved: JSON.parse(JSON.stringify(run.serialize())) });
+  assert.equal(w2.words[run2.game.puzzle.target], w.words[run.game.puzzle.target]);
+  assert.equal(run2.left, run.left, 'endless run restored');
+
+  // old id-based saves (v1) are ignored rather than misread
+  const legacy = new Game(w2, w2.puzzleFor(3), { puzzle: 3, path: [1, 2, 3], hops: [], status: 'won' });
+  assert.equal(legacy.path.length, 1);
+  console.log('saves survive graph rebuilds');
+}

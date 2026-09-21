@@ -3,3 +3,4 @@ scipy
 nltk
 wordfreq
 certifi
+better-profanity

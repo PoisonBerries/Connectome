@@ -106,29 +106,51 @@ export class Game {
     return this.hops.map((h) => Math.sign(h.before - h.after));
   }
 
+  /**
+   * Saves store *words*, not node ids, so rebuilding or expanding the word graph never corrupts a saved game.
+   * (Ids are only meaningful within one build of graph.json.)
+   */
   serialize() {
+    const w = this.world.words;
+    const words = (ids) => ids.map((i) => w[i]);
     return {
+      v: 2,
       puzzle: this.puzzle.num,
-      path: this.path,
-      hops: this.hops,
-      visited: [...this.visited],
+      path: words(this.path),
+      hops: this.hops.map((h) => [w[h.from], w[h.to]]),
+      visited: words([...this.visited]),
       gateways: this.gatewaysShown,
       compass: this.compassUses,
       status: this.status,
-      revealed: this.revealed,
+      revealed: this.revealed ? words(this.revealed) : null,
     };
   }
 
   _restore(s) {
-    const n = this.world.N;
-    const ok = (a) => Array.isArray(a) && a.every((x) => Number.isInteger(x) && x >= 0 && x < n);
-    if (!ok(s.path) || s.path[0] !== this.puzzle.start || !Array.isArray(s.hops)) return;
-    this.path = s.path;
-    this.hops = s.hops.filter((h) => ok([h.from, h.to]));
-    this.visited = new Set(ok(s.visited) ? s.visited : s.path);
+    if (!s || s.v !== 2 || !Array.isArray(s.path) || !Array.isArray(s.hops)) return;
+    const idx = this.world.index;
+    const ids = (arr) => (Array.isArray(arr) ? arr.map((x) => idx.get(x)) : null);
+    const path = ids(s.path);
+    if (!path || path.some((x) => x === undefined) || path[0] !== this.puzzle.start) return;
+
+    // keep the longest prefix of the saved path that is still a valid chain in this build of the graph
+    let keep = 1;
+    while (keep < path.length && this.world.neighbors(path[keep - 1]).includes(path[keep])) keep++;
+    this.path = path.slice(0, keep);
+
+    const d = this.dist;
+    this.hops = s.hops
+      .map(([f, t]) => [idx.get(f), idx.get(t)])
+      .filter(([f, t]) => f !== undefined && t !== undefined && this.world.neighbors(f).includes(t))
+      .map(([f, t]) => ({ from: f, to: t, before: d[f], after: d[t] }));
+    const visited = (ids(s.visited) || []).filter((x) => x !== undefined);
+    this.visited = new Set([...visited, ...this.path]);
     this.gatewaysShown = !!s.gateways;
     this.compassUses = s.compass | 0;
+    const revealed = ids(s.revealed);
+    this.revealed = revealed && revealed.every((x) => x !== undefined) ? revealed : null;
     this.status = ['playing', 'won', 'gaveup'].includes(s.status) ? s.status : 'playing';
-    this.revealed = ok(s.revealed) ? s.revealed : null;
+    // a "won" save whose route no longer reaches the target in this graph is no longer a win
+    if (this.status === 'won' && this.path[this.path.length - 1] !== this.puzzle.target) this.status = 'playing';
   }
 }

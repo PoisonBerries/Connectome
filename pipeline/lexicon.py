@@ -105,3 +105,28 @@ peters hawkins grant hansen castro hoffman hart elliott cunningham knight bradle
 JUNK |= set("dos aus mas das las rom gen bros pts ext fla ave blvd mph rpm lbs".split())
 
 BLOCKLIST |= set("explosion explosions blast blasts grenade grenades mortar mortars shrapnel landmine landmines bayonet insurgent insurgents insurgency militant militants rebels rebel checkpoint roadside troops gunmen warplanes airstrike airstrikes missile missiles warhead warheads".split())
+
+# ---- second pass, from auditing the built graph against a real profanity list (better-profanity)
+BLOCKLIST |= set("""
+cum semen sperm homo gays lesbians urine vomit junkie pimp thug queer virgin uterus womb paddy snuff hump suck jerk
+stupid pee tramp hooters playboy knob sniper opium seaman thrust oral facial gypsy redneck ghetto mistress brothel
+thong lingerie stripper hooker
+""".split())
+
+# words that list flags but are perfectly ordinary here (organ = instrument, screw = tool, hell = a place in idioms...)
+PROFANITY_ALLOW = set("hell dummy hemp pot rum vodka organ stroke screw slope maxi fat".split())
+
+try:
+    from better_profanity import profanity as _p
+
+    _p.load_censor_words()
+
+    def flagged(word):
+        """True if the well-known better-profanity list flags this word (minus our allow-list)."""
+        return word not in PROFANITY_ALLOW and _p.contains_profanity(word)
+except Exception:  # package missing: the hand-made lists above still apply
+
+    def flagged(word):
+        return False
+
+BLOCKLIST |= set("slain slaying killings noose minefield adultery blockade cartel gallows hanging hanged lynching massacres".split())

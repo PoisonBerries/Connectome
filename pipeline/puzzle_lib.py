@@ -68,6 +68,9 @@ fisherman chess derby hurdle rink volleyball diva guru
 
 # not-so-fun or sensitive endpoints that slipped through the automatic pool rules
 ENDPOINT_EXCLUDE |= set("""
+ra risk clue lent uno halo sims jung watt morse cook ruth curry hopper turner constable ares zen karma sonnet limerick haiku
+booker tony ali eros janus troll ogre goblin elf dwarf sirius pong sega atari kirby yoshi clue scuba compass anchor crown
+armor shield helmet throne dungeon
 gypsy lingerie underwear boxers trunks diaper asylum dungeon baggage mankind geek
 abdomen artery bladder bowel colon cortex cavity fetus uterus womb liver kidney lung marrow nerve retina receptor
 calcium lithium magnesium nickel potassium sodium titanium uranium aluminium asbestos
@@ -82,6 +85,7 @@ SECTION_THEME = {
     "countries": "place", "continents_regions": "place", "cities": "place", "us_states": "place", "landmarks": "place",
     "history_people": "people", "arts_people": "people", "fiction": "fiction", "mythology": "fiction",
     "brands": "brand", "culture_misc": "culture", "common_phrases": "culture", "space": "space",
+    "foods": "food", "creatures": "animal", "games": "culture", "everyday": "object",
 }
 LABEL_THEME = {
     "animal": "animal", "plant": "plant", "food or drink": "food", "building": "building", "structure": "building",

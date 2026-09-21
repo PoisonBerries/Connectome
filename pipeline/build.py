@@ -82,7 +82,7 @@ for disp, toks, section in curated:
     v = normalize(np.mean([V_all[idx_of[t]] for t in toks], axis=0, keepdims=True))[0]
     kind = 2 if section == "common_phrases" else 1
     key = disp.lower()
-    if key in DROP:
+    if key in DROP or (len(toks) == 1 and (toks[0] in BLOCKLIST or flagged(toks[0]))):
         continue
     nodes.setdefault(key, dict(disp=disp, vec=v, kind=kind, rank=min(rank_of.get(t, 10**6) for t in toks), toks=toks,
                                section=section))
@@ -127,7 +127,7 @@ for t in tokens:
         continue
     if not re.fullmatch(r"[a-z]{3,13}", t):
         continue
-    if t in STOPWORDS or t in BLOCKLIST or t in JUNK or t in DEMONYMS:
+    if t in STOPWORDS or t in BLOCKLIST or t in JUNK or t in DEMONYMS or flagged(t) or lemma_of(t) in BLOCKLIST:
         continue
     if t in nodes:
         continue
@@ -138,7 +138,7 @@ for t in tokens:
     if f is None:
         continue
     common.append((f, t))
-wset = {t for _, t in common}
+wset = {t for _, t in common} | set(nodes)  # curated words count too, so 'sandwiches' collapses into 'sandwich'
 common = [(f, t) for f, t in common if not (lemma_of(t) != t and lemma_of(t) in wset)]
 common.sort(key=lambda ft: -ft[0])
 common = [t for _, t in common[:N_COMMON]]

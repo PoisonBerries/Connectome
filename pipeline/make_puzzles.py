@@ -34,7 +34,7 @@ LABELS = {
     "countries": "country", "continents_regions": "place", "cities": "city", "us_states": "US state",
     "history_people": "historical figure", "arts_people": "artist or athlete", "fiction": "pop culture",
     "mythology": "myth & legend", "space": "space", "brands": "brand", "culture_misc": "culture",
-    "landmarks": "landmark", "common_phrases": "everyday phrase",
+    "landmarks": "landmark", "common_phrases": "everyday phrase", "foods": "food", "creatures": "animal", "games": "game", "everyday": "thing",
 }
 
 def label(i):
@@ -118,6 +118,14 @@ for idx in range(KEEP):
     gs, gt = word2idx.get(s_), word2idx.get(t_)
     if gs is None or gt is None or theme_of(G, gs) == theme_of(G, gt):
         continue
+    # the graph may have changed since it was published: use the true shortest route now, and re-roll if the
+    # difficulty has drifted more than a hop from what that weekday calls for
+    true_par = shortest_path(A, method="D", unweighted=True, indices=[gs])[0][gt]
+    want = DIST_BY_WEEKDAY[(EPOCH + dt.timedelta(days=idx - PAST_DAYS)).weekday()]
+    if not np.isfinite(true_par) or abs(true_par - want) > 1:
+        print(f"published puzzle #{idx + 1} ({s_} -> {t_}) drifted to par {true_par}; re-rolling")
+        continue
+    par = int(true_par)
     puzzles[idx] = dict(start=s_, target=t_, par=par, agent=0, sl=sl, tl=tl, _t=(theme_of(G, gs), theme_of(G, gt)))
     for g_ in (gs, gt):
         if g_ in pool_pos:

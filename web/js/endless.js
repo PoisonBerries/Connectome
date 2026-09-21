@@ -147,28 +147,37 @@ export class EndlessRun {
   }
 
   serialize() {
+    const w = this.world.words;
     const p = this.game.puzzle;
     return {
-      round: this.round, links: this.links, totalHops: this.totalHops, chain: this.chain, used: [...this.used],
+      v: 2, round: this.round, links: this.links, totalHops: this.totalHops,
+      chain: this.chain.map((i) => w[i]), used: [...this.used].map((i) => w[i]),
       over: this.over, reason: this.reason,
-      puzzle: { start: p.start, target: p.target, par: p.par },
+      puzzle: { start: w[p.start], target: w[p.target], par: p.par },
       game: this.game.serialize(),
     };
   }
 
   _restore(s) {
-    const n = this.world.N;
-    const ok = (a) => Array.isArray(a) && a.every((x) => Number.isInteger(x) && x >= 0 && x < n);
-    if (!s || !ok(s.chain) || !ok(s.used) || !s.puzzle || !ok([s.puzzle.start, s.puzzle.target])) return false;
-    if (!Number.isInteger(s.round) || s.round < 1) return false;
+    if (!s || s.v !== 2 || !Number.isInteger(s.round) || s.round < 1 || !s.puzzle) return false;
+    const idx = this.world.index;
+    const toIds = (arr) => (Array.isArray(arr) ? arr.map((x) => idx.get(x)) : [undefined]);
+    const chain = toIds(s.chain);
+    const used = toIds(s.used);
+    const start = idx.get(s.puzzle.start);
+    const target = idx.get(s.puzzle.target);
+    if ([...chain, ...used, start, target].some((x) => x === undefined)) return false;
+
     this.round = s.round;
     this.links = s.links | 0;
     this.totalHops = s.totalHops | 0;
-    this.chain = s.chain;
-    this.used = new Set(s.used);
+    this.chain = chain;
+    this.used = new Set(used);
     this.over = !!s.over;
     this.reason = s.reason || null;
-    const puzzle = { num: `e${this.round}`, start: s.puzzle.start, target: s.puzzle.target, par: s.puzzle.par, startLabel: '', targetLabel: '' };
+    const par = this.world.distTo(target)[start];
+    if (!(par > 0)) return false; // the graph changed and this round is no longer solvable
+    const puzzle = { num: `e${this.round}`, start, target, par, startLabel: '', targetLabel: '' };
     this.game = new Game(this.world, puzzle, s.game);
     // saved mid-celebration: move on to the next round
     if (!this.over && this.game.status === 'won') this.advance();
