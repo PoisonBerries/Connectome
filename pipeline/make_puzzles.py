@@ -14,8 +14,9 @@ from scipy.sparse.csgraph import shortest_path
 from puzzle_lib import load, adjacency, endpoint_pool, agent_moves
 from common import HERE
 
-EPOCH = dt.date(2026, 9, 21)  # puzzle #1 (a Monday)
+EPOCH = dt.date(2026, 9, 21)  # launch day (a Monday); archive puzzles run back from here
 N_DAYS = int(sys.argv[1]) if len(sys.argv) > 1 else 730
+PAST_DAYS = 7
 WEB = os.path.join(HERE, "..", "web", "data")
 os.makedirs(WEB, exist_ok=True)
 
@@ -59,45 +60,51 @@ type_of = [("P:" + cats[i]) if kinds[i] == 1 else ("C:" + cats[i]) for i in pool
 puzzles = []
 cos_cache = {}
 
-for day in range(N_DAYS):
+def choose(day, rng, prev_types):
+    """Pick a (start, target) pair for `day` (may be negative for pre-launch archive days)."""
     date = EPOCH + dt.timedelta(days=day)
     want = DIST_BY_WEEKDAY[date.weekday()]
-    order = rng.permutation(P)
-    found = None
-    prev_types = {puzzles[-1]["_t"][0], puzzles[-1]["_t"][1]} if puzzles else set()
-    for a in order:
-        if day - last_used[a] < REUSE_GAP:
+    for a in rng.permutation(P):
+        if abs(day - last_used[a]) < REUSE_GAP:
             continue
-        if type_of[a] in prev_types and len(prev_types) and rng.random() < 0.7:
+        if type_of[a] in prev_types and rng.random() < 0.7:
             continue
         cand = np.where((D[a] == want) & (C[a] < COS_MAX))[0]
-        cand = [b for b in cand if day - last_used[b] >= REUSE_GAP and type_of[b] != type_of[a]]
+        cand = [b for b in cand if abs(day - last_used[b]) >= REUSE_GAP and type_of[b] != type_of[a]]
         rng.shuffle(cand)
         for b in cand[:12]:
             ia, ib = pool[a], pool[b]
             m = agent_moves(nb, vecs @ vecs[ib], ia, ib)
             if m is not None and m <= AGENT_MAX * want:
-                found = (a, b, m)
-                break
-        if found:
-            break
-    if not found:
-        raise SystemExit(f"no puzzle for day {day}")
-    a, b, m = found
-    last_used[a] = last_used[b] = day
-    puzzles.append(dict(start=words[pool[a]], target=words[pool[b]], par=int(want), agent=int(m),
-                        sl=label(pool[a]), tl=label(pool[b]),
-                        _t=(type_of[a], type_of[b])))
+                last_used[a] = last_used[b] = day
+                return dict(start=words[ia], target=words[ib], par=int(want), agent=int(m),
+                            sl=label(ia), tl=label(ib), _t=(type_of[a], type_of[b]))
+    raise SystemExit(f"no puzzle for day {day}")
 
-for i in list(range(14)) + [100, 200, 400]:
+
+for day in range(N_DAYS):
+    prev = set(puzzles[-1]["_t"]) if puzzles else set()
+    puzzles.append(choose(day, rng, prev))
+
+# Archive seed: puzzles for the PAST_DAYS before launch, generated after (and independently of) the main calendar so
+# the launch-day puzzle never changes. Their endpoints avoid everything used in the first REUSE_GAP days.
+past = []
+rng_past = np.random.default_rng(20260914)
+for day in range(-PAST_DAYS, 0):
+    prev = set(past[-1]["_t"]) if past else set()
+    past.append(choose(day, rng_past, prev))
+puzzles = past + puzzles
+EPOCH_OUT = EPOCH - dt.timedelta(days=PAST_DAYS)
+
+for i in list(range(16)) + [100, 400]:
     p = puzzles[i]
-    print(f"#{i+1:<4} {(EPOCH+dt.timedelta(days=i)).strftime('%a')}  {p['start']:>14} -> {p['target']:<14} par {p['par']}  agent {p['agent']:>2}  [{p['sl']} / {p['tl']}]")
+    print(f"#{i+1:<4} {(EPOCH_OUT+dt.timedelta(days=i)).strftime('%a')}  {p['start']:>14} -> {p['target']:<14} par {p['par']}  agent {p['agent']:>2}  [{p['sl']} / {p['tl']}]")
 
 # ------------------------------------------------------------------ ship
 out_graph = dict(w=words, k=[int(x) for x in kinds], n=[int(x) for x in nb.ravel()])
 with open(os.path.join(WEB, "graph.json"), "w") as f:
     json.dump(out_graph, f, separators=(",", ":"))
-out_p = dict(epoch=EPOCH.isoformat(),
+out_p = dict(epoch=EPOCH_OUT.isoformat(),
              puzzles=[[p["start"], p["target"], p["par"], p["sl"], p["tl"]] for p in puzzles])
 with open(os.path.join(WEB, "puzzles.json"), "w") as f:
     json.dump(out_p, f, separators=(",", ":"))

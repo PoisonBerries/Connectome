@@ -26,7 +26,7 @@ then push to `main`. All asset paths are relative, so it works under `https://<u
 | Piece | Where | Notes |
 |---|---|---|
 | Word graph | `web/data/graph.json` | ~6,700 nodes, 5 out-links each, one strongly-connected component (every word can reach every other) |
-| Daily puzzles | `web/data/puzzles.json` | 730 days, generated offline. Puzzle #1 is 2026-09-21. Rolls over at the player's local midnight |
+| Daily puzzles | `web/data/puzzles.json` | 730 days, generated offline. Launch day was 2026-09-21 (#8); #1-#7 are archive puzzles for 9/14-9/20. Rolls over at the player's local midnight |
 | Game logic | `web/js/game.js`, `data.js` | Pure state machine + BFS (par, hints); unit-checked in `tests/` |
 | Look & feel | `web/js/stage.js`, `map.js`, `css/` | DOM buttons on an SVG synapse layer; canvas constellation of your explored network |
 | Saves & stats | `web/js/store.js` | localStorage only, no accounts, no backend |
