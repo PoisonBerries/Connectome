@@ -14,6 +14,9 @@ export class World {
   constructor(g, p) {
     this.words = g.w;
     this.pool = g.e || g.w.map((_, i) => i); // well-known words that make good puzzle endpoints
+    // theme of each endpoint word (place, people, food, ...): endless mode draws by theme so it stays varied
+    this.themes = new Map();
+    if (g.eg && g.gn) this.pool.forEach((id, i) => this.themes.set(id, g.gn[g.eg[i]]));
     this.kinds = g.k; // 0 word, 1 proper noun, 2 phrase
     this.out = Int32Array.from(g.n);
     this.N = this.words.length;
@@ -26,6 +29,10 @@ export class World {
     for (let i = 0; i < this.N; i++) for (let j = 0; j < K; j++) inn[this.out[i * K + j]].push(i);
     this.inn = inn;
     this._dist = new Map();
+  }
+
+  themeOf(id) {
+    return this.themes.get(id) ?? null;
   }
 
   neighbors(i) {

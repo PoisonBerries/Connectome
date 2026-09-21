@@ -60,6 +60,9 @@ Relatedness = cosine similarity of GloVe vectors after "all-but-the-top" post-pr
 few generic words don't appear in everyone's top five. Inflections and obvious relatives (dog/dogs, photo/photograph)
 are never offered as neighbours. Proper nouns come from a hand-curated list (`proper_nouns.txt`) rather than the
 news-heavy raw corpus, and profanity, slurs, and graphic-violence terms are excluded (`lexicon.py`).
+Endpoint words carry a **theme** (place, people, fiction, brand, food, animal, object, nature, ...). Puzzles and endless
+targets are drawn theme-first, and a start and target never share a theme, so there is no "Paris → Austria". Re-running
+`make_puzzles.py` keeps every already-published puzzle (through launch day) and only regenerates the future ones.
 Every puzzle's endpoints are picturable, well-known words that are semantically unrelated, and each is verified
 solvable by the simulated player.
 

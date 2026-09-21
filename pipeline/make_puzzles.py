@@ -11,7 +11,7 @@ import datetime as dt
 import numpy as np
 from scipy.sparse.csgraph import shortest_path
 
-from puzzle_lib import load, adjacency, endpoint_pool, agent_moves
+from puzzle_lib import load, adjacency, endpoint_pool, agent_moves, theme_of
 from common import HERE
 
 EPOCH = dt.date(2026, 9, 21)  # launch day (a Monday); archive puzzles run back from here
@@ -56,53 +56,91 @@ P = len(pool)
 rng = np.random.default_rng(20260921)
 
 last_used = np.full(P, -10**6)
-type_of = [("P:" + cats[i]) if kinds[i] == 1 else ("C:" + cats[i]) for i in pool]
-puzzles = []
-cos_cache = {}
+word2idx = {w: i for i, w in enumerate(words)}
+pool_pos = {int(g): k for k, g in enumerate(pool)}
+themes = [theme_of(G, i) for i in pool]
+by_theme = {}
+for k, t in enumerate(themes):
+    by_theme.setdefault(t, []).append(k)
+theme_names = sorted(by_theme)
+# how often each theme is drawn (places are plentiful but shouldn't dominate)
+THEME_WEIGHT = {"place": 0.7, "people": 1.0, "fiction": 1.0, "brand": 0.8, "culture": 1.0, "space": 0.4, "food": 1.2,
+                "animal": 1.0, "plant": 0.6, "object": 1.4, "nature": 0.7, "building": 0.9}
+theme_p = np.array([THEME_WEIGHT.get(t, 1.0) for t in theme_names])
+theme_p /= theme_p.sum()
 
-def choose(day, rng, prev_types):
-    """Pick a (start, target) pair for `day` (may be negative for pre-launch archive days)."""
+
+def choose(day, rng, prev_themes):
+    """Pick a (start, target) pair for `day` (negative = pre-launch archive day).
+
+    Draws a theme first (so the calendar is varied), then a word from it; the target is always from a *different*
+    theme, so there is never a place -> place or food -> food puzzle.
+    """
     date = EPOCH + dt.timedelta(days=day)
     want = DIST_BY_WEEKDAY[date.weekday()]
-    for a in rng.permutation(P):
-        if abs(day - last_used[a]) < REUSE_GAP:
+    for ti in rng.choice(len(theme_names), size=len(theme_names), replace=False, p=theme_p):
+        t = theme_names[ti]
+        if t in prev_themes and rng.random() < 0.7:
             continue
-        if type_of[a] in prev_types and rng.random() < 0.7:
-            continue
-        cand = np.where((D[a] == want) & (C[a] < COS_MAX))[0]
-        cand = [b for b in cand if abs(day - last_used[b]) >= REUSE_GAP and type_of[b] != type_of[a]]
-        rng.shuffle(cand)
-        for b in cand[:12]:
-            ia, ib = pool[a], pool[b]
-            m = agent_moves(nb, vecs @ vecs[ib], ia, ib)
-            if m is not None and m <= AGENT_MAX * want:
-                last_used[a] = last_used[b] = day
-                return dict(start=words[ia], target=words[ib], par=int(want), agent=int(m),
-                            sl=label(ia), tl=label(ib), _t=(type_of[a], type_of[b]))
+        members = list(by_theme[t])
+        rng.shuffle(members)
+        for a in members[:80]:
+            if abs(day - last_used[a]) < REUSE_GAP:
+                continue
+            cand = np.where((D[a] == want) & (C[a] < COS_MAX))[0]
+            cand = [b for b in cand if abs(day - last_used[b]) >= REUSE_GAP and themes[b] != t]
+            rng.shuffle(cand)
+            for b in cand[:12]:
+                ia, ib = pool[a], pool[b]
+                m = agent_moves(nb, vecs @ vecs[ib], ia, ib)
+                if m is not None and m <= AGENT_MAX * want:
+                    last_used[a] = last_used[b] = day
+                    return dict(start=words[ia], target=words[ib], par=int(want), agent=int(m),
+                                sl=label(ia), tl=label(ib), _t=(t, themes[b]))
     raise SystemExit(f"no puzzle for day {day}")
 
 
-for day in range(N_DAYS):
-    prev = set(puzzles[-1]["_t"]) if puzzles else set()
-    puzzles.append(choose(day, rng, prev))
-
-# Archive seed: puzzles for the PAST_DAYS before launch, generated after (and independently of) the main calendar so
-# the launch-day puzzle never changes. Their endpoints avoid everything used in the first REUSE_GAP days.
-past = []
-rng_past = np.random.default_rng(20260914)
-for day in range(-PAST_DAYS, 0):
-    prev = set(past[-1]["_t"]) if past else set()
-    past.append(choose(day, rng_past, prev))
-puzzles = past + puzzles
 EPOCH_OUT = EPOCH - dt.timedelta(days=PAST_DAYS)
+TOTAL = PAST_DAYS + N_DAYS
+puzzles = [None] * TOTAL
 
-for i in list(range(16)) + [100, 400]:
+# Puzzles up to and including launch day are already public: keep them, unless they break the theme rule
+# (e.g. Namibia -> Toronto), in which case they are re-rolled.
+KEEP = PAST_DAYS + 1
+published = os.path.join(WEB, "puzzles.json")
+old = json.load(open(published)) if os.path.exists(published) else None
+if old and old.get("epoch") != EPOCH_OUT.isoformat():
+    old = None
+for idx in range(KEEP):
+    if not old or idx >= len(old["puzzles"]):
+        continue
+    s_, t_, par, sl, tl = old["puzzles"][idx]
+    gs, gt = word2idx.get(s_), word2idx.get(t_)
+    if gs is None or gt is None or theme_of(G, gs) == theme_of(G, gt):
+        continue
+    puzzles[idx] = dict(start=s_, target=t_, par=par, agent=0, sl=sl, tl=tl, _t=(theme_of(G, gs), theme_of(G, gt)))
+    for g_ in (gs, gt):
+        if g_ in pool_pos:
+            last_used[pool_pos[g_]] = idx - PAST_DAYS
+
+rng_fix = np.random.default_rng(20260922)
+for idx in range(KEEP):
+    if puzzles[idx] is None:
+        prev = set(puzzles[idx - 1]["_t"]) if idx and puzzles[idx - 1] else set()
+        puzzles[idx] = choose(idx - PAST_DAYS, rng_fix, prev)
+        print(f"re-rolled published puzzle #{idx + 1}: {puzzles[idx]['start']} -> {puzzles[idx]['target']}")
+
+for idx in range(KEEP, TOTAL):
+    puzzles[idx] = choose(idx - PAST_DAYS, rng, set(puzzles[idx - 1]["_t"]))
+
+for i in list(range(16)) + [100, 400, 700]:
     p = puzzles[i]
     print(f"#{i+1:<4} {(EPOCH_OUT+dt.timedelta(days=i)).strftime('%a')}  {p['start']:>14} -> {p['target']:<14} par {p['par']}  agent {p['agent']:>2}  [{p['sl']} / {p['tl']}]")
 
 # ------------------------------------------------------------------ ship
 out_graph = dict(w=words, k=[int(x) for x in kinds], n=[int(x) for x in nb.ravel()],
-                 e=[int(x) for x in pool])  # well-known endpoint words: the pool endless mode draws from
+                 e=[int(x) for x in pool],  # well-known endpoint words: the pool endless mode draws from
+                 eg=[theme_names.index(t) for t in themes], gn=theme_names)  # each endpoint's theme, for variety
 with open(os.path.join(WEB, "graph.json"), "w") as f:
     json.dump(out_graph, f, separators=(",", ":"))
 out_p = dict(epoch=EPOCH_OUT.isoformat(),

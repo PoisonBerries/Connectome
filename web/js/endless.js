@@ -8,6 +8,9 @@ import { Game } from './game.js';
 
 export const BUDGET_MULT = 5;
 
+// How often each theme is drawn. Places are plentiful in the word pool but shouldn't dominate a run.
+const THEME_WEIGHT = { place: 0.7, people: 1, fiction: 1, brand: 0.8, culture: 1, space: 0.4, food: 1.2, animal: 1, plant: 0.6, object: 1.4, nature: 0.7, building: 0.9 };
+
 /** Shortest-route length for a round: 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, ... */
 export const parForRound = (round) => Math.min(8, 4 + Math.floor((round - 1) / 2));
 
@@ -29,8 +32,7 @@ export class EndlessRun {
     this.game = null;
 
     if (saved && this._restore(saved)) return;
-    const pool = world.pool;
-    const start = pool[Math.floor(rand() * pool.length)];
+    const start = this._pickVaried(world.pool);
     this.chain = [start];
     this.used.add(start);
     this._begin(start);
@@ -95,19 +97,52 @@ export class EndlessRun {
     this.game = new Game(this.world, puzzle, savedGame);
   }
 
+  /** Pick a word by theme first, then uniformly within it, so no single theme (say, places) crowds out the rest. */
+  _pickVaried(ids) {
+    const w = this.world;
+    const byTheme = new Map();
+    for (const id of ids) {
+      const t = w.themeOf(id) ?? '?';
+      if (!byTheme.has(t)) byTheme.set(t, []);
+      byTheme.get(t).push(id);
+    }
+    const themes = [...byTheme.keys()];
+    const weights = themes.map((t) => THEME_WEIGHT[t] ?? 1);
+    let r = this.rand() * weights.reduce((a, b) => a + b, 0);
+    let pick = themes[themes.length - 1];
+    for (let i = 0; i < themes.length; i++) {
+      if ((r -= weights[i]) <= 0) {
+        pick = themes[i];
+        break;
+      }
+    }
+    const list = byTheme.get(pick);
+    return list[Math.floor(this.rand() * list.length)];
+  }
+
   _roll(start, wantPar) {
     const w = this.world;
     const d = w.forwardDist(start);
     const fresh = w.pool.filter((t) => t !== start && !this.used.has(t) && d[t] > 0);
+    // never the same theme as where you are (no Paris -> Austria), and steer clear of the last couple of themes too
+    const recent = this.chain.slice(-2).map((id) => w.themeOf(id)).filter(Boolean);
+    const here = w.themeOf(start);
+    const filters = [
+      (t) => !recent.includes(w.themeOf(t)),
+      (t) => w.themeOf(t) !== here,
+      () => true,
+    ];
     // prefer the exact par; otherwise the nearest available distance
     const order = [0, -1, 1, -2, 2, -3, 3].map((k) => wantPar + k).filter((p) => p >= 3);
     let cands = [];
-    for (const p of order) {
-      cands = fresh.filter((t) => d[t] === p);
-      if (cands.length) break;
+    outer: for (const ok of filters) {
+      for (const p of order) {
+        cands = fresh.filter((t) => d[t] === p && ok(t));
+        if (cands.length) break outer;
+      }
     }
     if (!cands.length) cands = fresh.filter((t) => d[t] >= 3);
-    const target = cands[Math.floor(this.rand() * cands.length)];
+    const target = this._pickVaried(cands);
     return { num: `e${this.round}`, start, target, par: d[target], startLabel: '', targetLabel: '' };
   }
 

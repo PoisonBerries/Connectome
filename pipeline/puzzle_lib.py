@@ -45,6 +45,72 @@ snow ice fire storm thunder lightning cloud sunset moonlight meteor comet galaxy
 diamond gold silver treasure crown throne sword shield armor arrow bow
 """.split())
 
+# a second wave of everyday, picturable words (foods, animals, buildings, objects, jobs) so the pool isn't mostly proper nouns
+ENDPOINT_INCLUDE |= set("""
+almond avocado bacon banana barley basil bean biscuit broccoli buffet cabbage caramel cereal chili citrus cocoa corn
+cracker cucumber dessert dough garlic ginger gravy herring ketchup lamb lemon lemonade mango mustard oats olive pasta
+pastry peach peanut pear pepper plum pork potato pudding raspberry salad salmon sausage seafood sesame soup spaghetti
+spinach squash steak syrup toast trout tuna vanilla vinegar walnut wheat yogurt cocktail
+bunny cobra crow deer eagle goat hare hound insect lizard moose mosquito moth mule panther pigeon pony python rabbit
+rhino serpent shark sheep snail sparrow squid squirrel cattle
+aquarium attic auditorium bakery balcony ballroom barn basement bookstore boutique brewery cabin cafe cafeteria canyon
+casino cellar chapel classroom cliff clubhouse cottage courthouse courtyard cove crater delta farmhouse fortress
+fountain glacier gorge hostel inlet lagoon lobby manor marina monument motel nursery observatory patio pavilion plateau
+pond porch saloon seaside strait supermarket tavern tent terrace waterfall willow pine cedar aspen vine violet iris
+jasmine lavender poppy rosemary hazel
+altar basket canvas cassette chalk charcoal comb costume couch crate crib cupboard cushion denim doll drone envelope
+flashlight freezer furnace gong gown hammer handbag heater helm hose jeans jeep kettle lamp lantern leash locker
+luggage magnet oven purse saddle scissors shovel shorts silk sofa sock spoon spacecraft suitcase sunglasses sweater
+tanker tray trolley trousers vase vault wagon wallet wardrobe wool torch turbine cruiser
+bartender comedian composer conductor dancer mechanic miner musician novelist painter pianist sailor songwriter waiter
+fisherman chess derby hurdle rink volleyball diva guru
+""".split())
+
+# not-so-fun or sensitive endpoints that slipped through the automatic pool rules
+ENDPOINT_EXCLUDE |= set("""
+gypsy lingerie underwear boxers trunks diaper asylum dungeon baggage mankind geek
+abdomen artery bladder bowel colon cortex cavity fetus uterus womb liver kidney lung marrow nerve retina receptor
+calcium lithium magnesium nickel potassium sodium titanium uranium aluminium asbestos
+imam rabbi pastor preacher monastery synagogue chaplain archbishop convent
+dagger firearm pistol revolver shotgun brandy cider sherry whiskey
+""".split())
+
+# -------------------------------------------------------------- themes (for variety)
+# Endpoints are sampled by theme first, and two endpoints of the same theme are never paired,
+# so a puzzle can't be "Paris -> Austria".
+SECTION_THEME = {
+    "countries": "place", "continents_regions": "place", "cities": "place", "us_states": "place", "landmarks": "place",
+    "history_people": "people", "arts_people": "people", "fiction": "fiction", "mythology": "fiction",
+    "brands": "brand", "culture_misc": "culture", "common_phrases": "culture", "space": "space",
+}
+LABEL_THEME = {
+    "animal": "animal", "plant": "plant", "food or drink": "food", "building": "building", "structure": "building",
+    "landform": "nature", "waterway": "nature", "space": "nature",
+    "job": "people", "performer": "people", "person": "people", "scientist": "people", "artist": "people", "writer": "people",
+}
+# quick hand overrides where WordNet's first sense misleads (whale -> "a very large person")
+THEME_OVERRIDE = {}
+for theme, words in {
+    "animal": "whale dolphin octopus penguin kangaroo giraffe zebra panda gorilla cheetah leopard tiger crocodile alligator turtle frog owl parrot flamingo peacock swan bat spider scorpion jellyfish lobster crab shrimp oyster camel wolf lion horse pig cow duck chicken snake mouse rabbit dragon unicorn dinosaur puppy bird fish".split(),
+    "food": "banana ginger garlic vanilla pepper corn wheat olive almond avocado mango peach pear plum lemon lamb pizza sandwich popcorn pancake waffle pretzel donut cupcake lollipop sushi noodle burger taco cheese honey cookie cake candy chocolate coffee juice beer bread butter rice sugar meat beef pumpkin strawberry watermelon cherry coconut pineapple mushroom carrot tomato orange apple".split(),
+    "culture": "chess derby".split(),
+    "nature": "volcano earthquake hurricane tornado rainbow snow ice fire storm thunder lightning cloud sunset meteor comet galaxy eclipse ocean river lake mountain island jungle desert valley hill coast".split(),
+    "building": "castle palace temple mosque church cathedral hospital stadium airport harbor bridge tunnel skyscraper windmill lighthouse library museum school hotel restaurant prison factory tower pyramid".split(),
+    "people": "astronaut cowboy detective wizard witch vampire zombie ghost mermaid fairy giant knight king queen princess clown magician pirate soldier pilot poet singer scientist priest pope".split(),
+}.items():
+    for w in words:
+        THEME_OVERRIDE[w] = theme
+
+
+def theme_of(G, i):
+    w = G["words"][i]
+    if G["kinds"][i] != 0:
+        return SECTION_THEME.get(G["cats"][i], "culture")
+    if w.lower() in THEME_OVERRIDE:
+        return THEME_OVERRIDE[w.lower()]
+    return LABEL_THEME.get(label_for(w), "object")
+
+
 def load(path="out/graph.npz"):
     g = np.load(path)
     words = [str(w) for w in g["words"]]

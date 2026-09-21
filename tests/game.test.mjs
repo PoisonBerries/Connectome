@@ -30,6 +30,16 @@ for (let n = 1; n <= w.puzzles.length; n++) {
 assert.equal(bad, 0, 'shipped par differs from BFS par');
 console.log('par distribution', parCounts);
 
+// the calendar never pairs two words of the same theme (no Paris -> Austria)
+{
+  let same = 0;
+  for (const [s, t2] of w.puzzles.map((p) => [w.index.get(p.start), w.index.get(p.target)])) {
+    const a = w.themeOf(s), b = w.themeOf(t2);
+    if (a && b && a === b) same++;
+  }
+  assert(same <= 0, `${same} calendar puzzles pair two words of the same theme`);
+}
+
 // play puzzle 1 optimally
 const pz = w.puzzleFor(1);
 const game = new Game(w, pz);
@@ -80,6 +90,7 @@ console.log('all game logic checks passed');
     const pz = run.game.puzzle;
     if (prevTarget !== null) assert.equal(pz.start, prevTarget, 'target becomes next start');
     assert(pz.par >= 3 && pz.par <= 9, 'par in range');
+    assert.notEqual(w.themeOf(pz.start), w.themeOf(pz.target), `round ${r}: start and target share a theme`);
     assert.equal(run.budget, BUDGET_MULT * pz.par);
     assert.equal(run.left, run.budget);
     const route = w.shortestPath(pz.start, pz.target);
@@ -90,6 +101,20 @@ console.log('all game logic checks passed');
     assert(run.advance());
   }
   assert.equal(run.links, 12);
+
+  // variety: over many rolls, no same-theme pairs and places don't dominate
+  const counts = {};
+  let sameTheme = 0;
+  for (let n = 0; n < 300; n++) {
+    const r = new EndlessRun(w, { rand });
+    const th = w.themeOf(r.game.puzzle.target);
+    counts[th] = (counts[th] || 0) + 1;
+    if (w.themeOf(r.game.puzzle.start) === th) sameTheme++;
+  }
+  assert.equal(sameTheme, 0, 'no same-theme start/target');
+  assert(counts.place / 300 < 0.2, `places should be under 20% of targets, got ${counts.place}`);
+  assert(Object.keys(counts).length >= 8, 'themes are varied');
+  console.log('target theme mix over 300 runs:', counts);
   assert.equal(new Set(run.chain).size, run.chain.length, 'no word repeats in a chain');
 
   // run out of moves: wander until the budget is gone
