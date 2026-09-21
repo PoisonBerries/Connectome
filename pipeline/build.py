@@ -1,8 +1,9 @@
 """Build the Connectome word graph.
 
-  python3 build.py [N_COMMON] [ALPHA]
+  python3 build.py [N_COMMON] [ALPHA] [--diversity L=0.30] [--bridge K=0] [--mutual B=0.08] [--clusters C] [--tag NAME]
 
-Writes out/graph.npz: display names, node kinds, top-5 neighbour ids and unit vectors.
+Writes out/graph.npz (or out/graph_NAME.npz with --tag): display names, node kinds, top-5 neighbour ids, unit vectors.
+The optional switches are experiments in how the five links are chosen; see evaluate.py for how they are compared.
 """
 import os
 import re
@@ -16,8 +17,18 @@ from common import RAW, HERE, load_cased_forms, display_form, normalize
 from lexicon import *
 from graph import lemma_of, csls_neighbors, largest_scc
 
-N_COMMON = int(sys.argv[1]) if len(sys.argv) > 1 else 7000
-ALPHA = float(sys.argv[2]) if len(sys.argv) > 2 else 1.0
+import argparse
+
+ap = argparse.ArgumentParser()
+ap.add_argument("n_common", nargs="?", type=int, default=6000)
+ap.add_argument("alpha", nargs="?", type=float, default=1.0)  # CSLS hub penalty
+ap.add_argument("--diversity", type=float, default=0.30)  # MMR: penalise a link for resembling links already chosen
+ap.add_argument("--bridge", type=int, default=0)  # minimum links that must leave the word's own cluster
+ap.add_argument("--mutual", type=float, default=0.08)  # bonus for links the other word would also make
+ap.add_argument("--clusters", type=int, default=90)
+ap.add_argument("--tag", default="")
+args = ap.parse_args()
+N_COMMON, ALPHA = args.n_common, args.alpha
 OUT = os.path.join(HERE, "out")
 os.makedirs(OUT, exist_ok=True)
 
@@ -177,23 +188,54 @@ def related_forms(i, j):
 
 def build_graph(active):
     """active: array of node ids. Returns neighbour matrix in *local* ids."""
+    from scipy.cluster.vq import kmeans2
+
     V = vecs[active]
     idxs, sims, r = csls_neighbors(V, pool=70)
     n = len(active)
+    labels = kmeans2(V, args.clusters, minit="++", seed=0)[1] if args.bridge else None
+    top_sets = [set(map(int, idxs[j, :15])) for j in range(n)] if args.mutual else None
     out = np.full((n, 5), -1, dtype=np.int32)
+
+    def ok(i, b, chosen):
+        return not related_forms(active[i], active[b]) and not any(related_forms(active[b], active[c]) for c in chosen)
+
     for i in range(n):
-        score = sims[i] - ALPHA * 0.5 * r[idxs[i]]
-        order = np.argsort(-score)
-        chosen = []
-        for j in order:
-            b = int(idxs[i, j])
-            if related_forms(active[i], active[b]):
-                continue
-            if any(related_forms(active[b], active[c]) for c in chosen):
-                continue
-            chosen.append(b)
-            if len(chosen) == 5:
+        cand = idxs[i]
+        score = sims[i] - ALPHA * 0.5 * r[cand]
+        if args.mutual:
+            score = score + args.mutual * np.array([i in top_sets[int(b)] for b in cand])
+        C = (V[cand] @ V[cand].T) if args.diversity else None
+        alive = np.ones(len(cand), bool)
+        chosen, pos = [], []
+        while len(chosen) < 5:
+            adj = score.copy()
+            if args.diversity and pos:
+                adj -= args.diversity * C[:, pos].max(axis=1)
+            adj[~alive] = -np.inf
+            j = int(np.argmax(adj))
+            if adj[j] == -np.inf:
                 break
+            alive[j] = False
+            b = int(cand[j])
+            if ok(i, b, chosen):
+                chosen.append(b)
+                pos.append(j)
+        if args.bridge and chosen:
+            # guarantee some links that leave this word's neighbourhood, so it isn't a dead-end clique
+            outside = sum(labels[c] != labels[i] for c in chosen)
+            for j in np.argsort(-score):
+                if outside >= args.bridge:
+                    break
+                b = int(cand[j])
+                if labels[b] == labels[i] or b in chosen or not ok(i, b, chosen):
+                    continue
+                # replace the weakest in-cluster link
+                inside = [k for k, c in enumerate(chosen) if labels[c] == labels[i]]
+                if not inside:
+                    break
+                chosen[inside[-1]] = b
+                outside += 1
         out[i, :len(chosen)] = chosen
     return out
 
@@ -213,7 +255,7 @@ nb = build_graph(active)
 n = len(active)
 final_words = [words[i] for i in active]
 final_kinds = kinds[active]
-np.savez(os.path.join(OUT, "graph.npz"), words=np.array(final_words), kinds=final_kinds, nbrs=nb,
+np.savez(os.path.join(OUT, f"graph_{args.tag}.npz" if args.tag else "graph.npz"), words=np.array(final_words), kinds=final_kinds, nbrs=nb,
          vecs=vecs[active], ranks=np.array([nodes[keys[i]]["rank"] for i in active]),
          sections=np.array([nodes[keys[i]]["section"] for i in active]),
          zipf=np.array([zipf_frequency(nodes[keys[i]]["disp"].lower(), "en") for i in active], dtype=np.float32))

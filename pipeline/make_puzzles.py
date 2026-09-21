@@ -55,6 +55,27 @@ C = vecs[pool] @ vecs[pool].T
 P = len(pool)
 rng = np.random.default_rng(20260921)
 
+# ---- approachability: how often a simple semantic navigator reaches each word from elsewhere in the pool.
+# Some words have gateways that are semantically odd, so you can't steer toward them (see evaluate.py); endless mode
+# uses this to avoid rolling near-unreachable targets.
+def approachability(samples=30):
+    arng = np.random.default_rng(5)
+    out = np.zeros(P, dtype=np.int16)
+    for b in range(P):
+        srcs = np.where((D[:, b] >= 4) & (D[:, b] <= 8))[0]
+        if len(srcs) == 0:
+            out[b] = 0
+            continue
+        srcs = arng.choice(srcs, min(samples, len(srcs)), replace=False)
+        cosb = vecs @ vecs[pool[b]]
+        wins = sum(agent_moves(nb, cosb, int(pool[a]), int(pool[b]), max_moves=int(5 * D[a, b])) is not None for a in srcs)
+        out[b] = round(100 * wins / len(srcs))
+    return out
+
+
+approach = approachability()
+print("approachability of endpoint words (%% solved by a simple navigator): p10=%d p25=%d p50=%d p75=%d" % tuple(np.percentile(approach, [10, 25, 50, 75])))
+
 last_used = np.full(P, -10**6)
 word2idx = {w: i for i, w in enumerate(words)}
 pool_pos = {int(g): k for k, g in enumerate(pool)}
@@ -148,7 +169,8 @@ for i in list(range(16)) + [100, 400, 700]:
 # ------------------------------------------------------------------ ship
 out_graph = dict(w=words, k=[int(x) for x in kinds], n=[int(x) for x in nb.ravel()],
                  e=[int(x) for x in pool],  # well-known endpoint words: the pool endless mode draws from
-                 eg=[theme_names.index(t) for t in themes], gn=theme_names)  # each endpoint's theme, for variety
+                 eg=[theme_names.index(t) for t in themes], gn=theme_names,
+                 ea=[int(x) for x in approach])  # each endpoint's theme, for variety
 with open(os.path.join(WEB, "graph.json"), "w") as f:
     json.dump(out_graph, f, separators=(",", ":"))
 out_p = dict(epoch=EPOCH_OUT.isoformat(),

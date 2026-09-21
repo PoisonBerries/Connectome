@@ -9,6 +9,9 @@ import { Game } from './game.js';
 export const BUDGET_MULT = 5;
 
 // How often each theme is drawn. Places are plentiful in the word pool but shouldn't dominate a run.
+/** Targets that a simple semantic navigator reaches less often than this are skipped (when alternatives exist). */
+export const MIN_APPROACH = 40;
+
 const THEME_WEIGHT = { place: 0.7, people: 1, fiction: 1, brand: 0.8, culture: 1, space: 0.4, food: 1.2, animal: 1, plant: 0.6, object: 1.4, nature: 0.7, building: 0.9 };
 
 /** Shortest-route length for a round: 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, ... */
@@ -127,8 +130,10 @@ export class EndlessRun {
     // never the same theme as where you are (no Paris -> Austria), and steer clear of the last couple of themes too
     const recent = this.chain.slice(-2).map((id) => w.themeOf(id)).filter(Boolean);
     const here = w.themeOf(start);
+    const reachable = (t) => w.approachOf(t) >= MIN_APPROACH;
     const filters = [
-      (t) => !recent.includes(w.themeOf(t)),
+      (t) => reachable(t) && !recent.includes(w.themeOf(t)),
+      (t) => reachable(t) && w.themeOf(t) !== here,
       (t) => w.themeOf(t) !== here,
       () => true,
     ];

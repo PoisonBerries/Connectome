@@ -25,7 +25,7 @@ then push to `main`. All asset paths are relative, so it works under `https://<u
 
 | Piece | Where | Notes |
 |---|---|---|
-| Word graph | `web/data/graph.json` | ~7,400 nodes, 5 out-links each, one strongly-connected component (every word can reach every other) |
+| Word graph | `web/data/graph.json` | ~7,500 nodes, 5 out-links each, one strongly-connected component (every word can reach every other) |
 | Daily puzzles | `web/data/puzzles.json` | 730 days, generated offline. Launch day was 2026-09-21 (#8); #1-#7 are archive puzzles for 9/14-9/20. Rolls over at the player's local midnight |
 | Game logic | `web/js/game.js`, `data.js` | Pure state machine + BFS (par, hints); unit-checked in `tests/` |
 | Look & feel | `web/js/stage.js`, `map.js`, `css/` | DOM buttons on an SVG synapse layer; canvas constellation of your explored network |
@@ -57,7 +57,12 @@ node ../tests/game.test.mjs   # sanity checks on the shipped data
 ```
 
 Relatedness = cosine similarity of GloVe vectors after "all-but-the-top" post-processing, with a CSLS hub penalty so a
-few generic words don't appear in everyone's top five. Inflections and obvious relatives (dog/dogs, photo/photograph)
+few generic words don't appear in everyone's top five. The five links are then chosen for *diversity* (an MMR penalty
+keeps them from being five near-synonyms, which is what pulls in associations like kimchi → Korea) with a small bonus for
+links the other word would return. `pipeline/evaluate.py` compares variants on structure, path length and a simulated
+player: versus plain top-five, this cut tight cliques from 13% to 1.5% and raised the simulated solve rate from 45% to 64%.
+Each endpoint also gets an *approachability* score (how often a simple navigator reaches it) so endless mode avoids
+near-unreachable targets. Inflections and obvious relatives (dog/dogs, photo/photograph)
 are never offered as neighbours. Proper nouns come from a hand-curated list (`proper_nouns.txt`) rather than the
 news-heavy raw corpus, and profanity, slurs, and graphic-violence terms are excluded (`lexicon.py`).
 Endpoint words carry a **theme** (place, people, fiction, brand, food, animal, object, nature, ...). Puzzles and endless

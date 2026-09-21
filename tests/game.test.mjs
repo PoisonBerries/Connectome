@@ -114,6 +114,16 @@ console.log('all game logic checks passed');
   assert.equal(sameTheme, 0, 'no same-theme start/target');
   assert(counts.place / 300 < 0.2, `places should be under 20% of targets, got ${counts.place}`);
   assert(Object.keys(counts).length >= 8, 'themes are varied');
+
+  // targets are steerable: nearly every rolled target clears the approachability floor
+  const { MIN_APPROACH } = await import('../web/js/endless.js');
+  let hard = 0;
+  for (let n = 0; n < 300; n++) {
+    const r = new EndlessRun(w, { rand });
+    if (w.approachOf(r.game.puzzle.target) < MIN_APPROACH) hard++;
+  }
+  assert(hard <= 6, `too many hard-to-reach targets rolled: ${hard}/300`);
+  console.log('hard-to-reach targets rolled:', hard, '/ 300');
   console.log('target theme mix over 300 runs:', counts);
   assert.equal(new Set(run.chain).size, run.chain.length, 'no word repeats in a chain');
 
