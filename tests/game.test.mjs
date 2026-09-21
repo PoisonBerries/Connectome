@@ -58,5 +58,10 @@ assert.deepEqual(g3.path, g2.path); assert.equal(g3.score, g2.score);
 const g4 = new Game(w, pz); g4.giveUp();
 assert.equal(g4.revealed.length - 1, pz.par);
 
+// tier thresholds (par 6): perfect<=6, prodigy<=9, synaptic<=15, neural<=21, wanderer<=30, tangled beyond
+const tiers = [6, 7, 9, 10, 15, 16, 21, 22, 30, 31].map((sc) => tierIndex(sc, 6));
+assert.deepEqual(tiers, [0, 1, 1, 2, 2, 3, 3, 4, 4, 5]);
+assert.equal(tierIndex(8, 5), 1); assert.equal(tierIndex(12, 8), 1); assert.equal(tierIndex(13, 8), 2);
+
 console.log('date of #1:', dateOfPuzzle(w, 1).toDateString(), '| today is #', todayNumber(w));
 console.log('all game logic checks passed');

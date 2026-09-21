@@ -56,13 +56,16 @@ export const TIERS = [
   { id: 'tangled', name: 'Tangled', emoji: '🌀', dots: 1 },
 ];
 
-/** Rate a finished game by score (hops + hint penalties) against par. */
+/**
+ * Rate a finished game by score (hops + hint penalties) against par.
+ * Tuned so a typical player (roughly 2.5-3x par) lands mid-table rather than near the bottom.
+ */
 export function tierIndex(score, par) {
   if (score <= par) return 0;
-  if (score <= par + 2) return 1;
-  if (score <= par * 1.7) return 2;
-  if (score <= par * 2.6) return 3;
-  if (score <= par * 4) return 4;
+  if (score <= Math.max(par + 3, par * 1.5)) return 1;
+  if (score <= par * 2.5) return 2;
+  if (score <= par * 3.5) return 3;
+  if (score <= par * 5) return 4;
   return 5;
 }
 
