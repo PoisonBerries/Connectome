@@ -1,0 +1,7 @@
+# large raw datasets and intermediates: regenerate with the pipeline, never commit
+pipeline/raw/
+pipeline/out/
+pipeline/__pycache__/
+__pycache__/
+.DS_Store
+node_modules/

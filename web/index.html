@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Connectome — the daily word-wiring game</title>
+  <meta name="description" content="Wire your way from one idea to another. Every word links to its five most related words. Get from A to B in as few hops as you can. A new puzzle every day.">
+  <meta name="theme-color" content="#070913">
+  <meta property="og:title" content="Connectome — the daily word-wiring game">
+  <meta property="og:description" content="Every word links to its five most related words. Wire your way from one idea to another in as few hops as you can.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <script>
+    // Resolve the theme before first paint so light-mode players never see a dark flash.
+    (function () {
+      try {
+        var s = JSON.parse(localStorage.getItem('connectome:v1:settings') || '{}');
+        var pref = s.theme || 'auto';
+        var light = pref === 'light' || (pref === 'auto' && matchMedia('(prefers-color-scheme: light)').matches);
+        document.documentElement.dataset.theme = light ? 'light' : 'dark';
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body>
+  <canvas id="ambient" aria-hidden="true"></canvas>
+
+  <div class="app" id="app">
+    <header class="topbar">
+      <div class="side left">
+        <button class="icon-btn" id="btn-archive" data-icon="calendar" aria-label="Puzzle archive"></button>
+      </div>
+      <h1 class="wordmark" aria-label="Connectome">c<span class="glyph" aria-hidden="true"></span>nnectome</h1>
+      <div class="side right">
+        <button class="icon-btn" id="btn-help" data-icon="help" aria-label="How to play"></button>
+        <button class="icon-btn" id="btn-stats" data-icon="stats" aria-label="Statistics"></button>
+        <button class="icon-btn" id="btn-settings" data-icon="settings" aria-label="Settings"></button>
+      </div>
+    </header>
+
+    <main>
+      <p class="puzzle-meta" id="puzzle-meta"><span id="meta-num"></span><i></i><span id="meta-date"></span></p>
+
+      <section class="mission" aria-label="Your mission">
+        <div class="endpoint from">
+          <span class="tag">From</span>
+          <span class="word" id="from-word"></span>
+          <span class="sub" id="from-sub"></span>
+        </div>
+        <div class="link" aria-live="polite">
+          <div class="hops"><span id="hop-count">0</span><small>hops</small></div>
+          <div class="par">par <b id="par-count">–</b></div>
+        </div>
+        <div class="endpoint to">
+          <span class="tag">To</span>
+          <span class="word" id="to-word"></span>
+          <span class="sub" id="to-sub"></span>
+        </div>
+      </section>
+
+      <div class="gateways" id="gateways" hidden>
+        <span class="label">Words that link straight to the target</span>
+        <span class="chips" id="gateway-chips"></span>
+      </div>
+
+      <nav class="trail" id="trail" aria-label="Your path so far"></nav>
+
+      <section class="stage-wrap">
+        <div class="stage" id="stage">
+          <svg class="synapses" id="synapses" aria-hidden="true"></svg>
+          <div class="nodes" id="nodes"></div>
+          <canvas class="burst" id="burst" aria-hidden="true"></canvas>
+        </div>
+        <p class="sr-only" id="live" aria-live="polite"></p>
+      </section>
+
+      <section class="controls" aria-label="Controls">
+        <button class="ctl" id="btn-undo" data-icon="undo"><span>Back</span></button>
+        <button class="ctl" id="btn-hint" data-icon="bulb"><span>Hint</span></button>
+        <button class="ctl" id="btn-map" data-icon="nodes"><span>Map</span></button>
+        <button class="ctl" id="btn-giveup" data-icon="flag"><span>Reveal</span></button>
+        <button class="btn primary wide" id="btn-results" hidden>See results</button>
+      </section>
+    </main>
+  </div>
+
+  <!-- How to play -->
+  <dialog id="dlg-help" aria-labelledby="help-title">
+    <form method="dialog" class="dlg-close"><button class="icon-btn" data-icon="close" aria-label="Close"></button></form>
+    <h2 id="help-title">How to play</h2>
+    <p class="lede">Wire your way from one idea to another.</p>
+    <div class="help-demo" aria-hidden="true">
+      <div class="hd-center">taco</div>
+      <span class="hd hd1">Mexico</span><span class="hd hd2">salsa</span><span class="hd hd3">burrito</span>
+      <span class="hd hd4">pizza</span><span class="hd hd5">cheese</span>
+    </div>
+    <ol class="steps">
+      <li><b>Every word links to its five most related words.</b> Tap one to hop to it.</li>
+      <li><b>Reach the target</b> in as few hops as you can. Par is the shortest possible route.</li>
+      <li><b>Backing up is free</b>, but every hop you make counts, dead ends included.</li>
+      <li><b>Stuck?</b> Hints help, at a small cost to your score.</li>
+    </ol>
+    <p class="fine">Related means "shows up in the same contexts", so words can be linked by meaning, place, or pop culture. Think laterally! A new puzzle arrives every day at midnight.</p>
+    <button class="btn primary" id="help-go">Start wiring</button>
+  </dialog>
+
+  <!-- Stats -->
+  <dialog id="dlg-stats" aria-labelledby="stats-title">
+    <form method="dialog" class="dlg-close"><button class="icon-btn" data-icon="close" aria-label="Close"></button></form>
+    <h2 id="stats-title">Statistics</h2>
+    <div class="stat-row" id="stat-row"></div>
+    <h3>How well you wire</h3>
+    <div class="dist" id="dist"></div>
+    <div class="next" id="stats-next"></div>
+  </dialog>
+
+  <!-- Archive -->
+  <dialog id="dlg-archive" aria-labelledby="arch-title">
+    <form method="dialog" class="dlg-close"><button class="icon-btn" data-icon="close" aria-label="Close"></button></form>
+    <h2 id="arch-title">Archive</h2>
+    <p class="lede">Missed a day? Play any past puzzle.</p>
+    <div class="cal-head">
+      <button class="icon-btn" id="cal-prev" data-icon="chevron-left" aria-label="Previous month"></button>
+      <b id="cal-title"></b>
+      <button class="icon-btn" id="cal-next" data-icon="chevron-right" aria-label="Next month"></button>
+    </div>
+    <div class="cal" id="cal" role="grid"></div>
+  </dialog>
+
+  <!-- Settings -->
+  <dialog id="dlg-settings" aria-labelledby="set-title">
+    <form method="dialog" class="dlg-close"><button class="icon-btn" data-icon="close" aria-label="Close"></button></form>
+    <h2 id="set-title">Settings</h2>
+    <div class="setting">
+      <div><b>Theme</b><small>Follow your device or pick one.</small></div>
+      <div class="seg" id="seg-theme" role="radiogroup" aria-label="Theme">
+        <button role="radio" data-v="auto">Auto</button>
+        <button role="radio" data-v="dark">Dark</button>
+        <button role="radio" data-v="light">Light</button>
+      </div>
+    </div>
+    <label class="setting">
+      <div><b>Sound</b><small>Synapse blips that rise as you close in.</small></div>
+      <input type="checkbox" class="switch" id="set-sound">
+    </label>
+    <label class="setting">
+      <div><b>Animations</b><small>Signals, glows and drifting neurons.</small></div>
+      <input type="checkbox" class="switch" id="set-motion">
+    </label>
+    <div class="setting">
+      <div><b>Reset progress</b><small>Clears stats, streaks and saved games.</small></div>
+      <button class="btn danger sm" id="set-reset">Reset</button>
+    </div>
+    <p class="fine credits">Word associations derived from <a href="https://nlp.stanford.edu/projects/glove/" target="_blank" rel="noopener">GloVe</a> embeddings (Stanford, public domain).</p>
+  </dialog>
+
+  <!-- Hints (bottom sheet) -->
+  <dialog id="dlg-hint" class="sheet" aria-labelledby="hint-title">
+    <form method="dialog" class="dlg-close"><button class="icon-btn" data-icon="close" aria-label="Close"></button></form>
+    <h2 id="hint-title">Need a nudge?</h2>
+    <button class="hint-opt" id="hint-gateways">
+      <span class="hi" data-icon="target"></span>
+      <span><b>Gateways</b><small>Show every word that links straight to the target.</small></span>
+      <em>+1</em>
+    </button>
+    <button class="hint-opt" id="hint-compass">
+      <span class="hi" data-icon="compass"></span>
+      <span><b>Compass</b><small>Light up the options that sit on a shortest route from here.</small></span>
+      <em>+2</em>
+    </button>
+    <p class="fine">Hint costs are added to your hop count.</p>
+  </dialog>
+
+  <!-- Map -->
+  <dialog id="dlg-map" aria-labelledby="map-title">
+    <form method="dialog" class="dlg-close"><button class="icon-btn" data-icon="close" aria-label="Close"></button></form>
+    <h2 id="map-title">Your connectome</h2>
+    <p class="lede" id="map-sub"></p>
+    <canvas class="constellation" id="map-canvas"></canvas>
+    <div class="legend">
+      <span><i class="dot start"></i>start</span><span><i class="dot path"></i>your path</span>
+      <span><i class="dot dead"></i>dead end</span><span><i class="dot seen"></i>seen</span><span><i class="dot goal"></i>target</span>
+    </div>
+  </dialog>
+
+  <!-- Give up -->
+  <dialog id="dlg-giveup" class="sheet" aria-labelledby="giveup-title">
+    <h2 id="giveup-title">Reveal the shortest path?</h2>
+    <p class="lede">This ends the puzzle and won't count as a win.</p>
+    <div class="row">
+      <button class="btn" id="giveup-no">Keep wiring</button>
+      <button class="btn danger" id="giveup-yes">Reveal it</button>
+    </div>
+  </dialog>
+
+  <!-- Result -->
+  <dialog id="dlg-result" aria-labelledby="res-title">
+    <form method="dialog" class="dlg-close"><button class="icon-btn" data-icon="close" aria-label="Close"></button></form>
+    <div class="res-head">
+      <div class="res-emoji" id="res-emoji"></div>
+      <h2 id="res-title"></h2>
+      <p class="lede" id="res-sub"></p>
+    </div>
+    <div class="res-stats" id="res-stats"></div>
+    <div class="row">
+      <button class="btn primary" id="btn-share" data-icon="share"><span>Share</span></button>
+      <button class="btn" id="btn-copy" data-icon="copy"><span>Copy</span></button>
+    </div>
+    <canvas class="constellation" id="res-canvas"></canvas>
+    <details class="route" id="res-route"><summary>The shortest route</summary><div id="res-route-body"></div></details>
+    <pre class="share-preview" id="share-preview"></pre>
+    <div class="res-mini" id="res-mini"></div>
+    <div class="next" id="res-next"></div>
+  </dialog>
+
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

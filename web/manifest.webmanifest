@@ -1,0 +1,10 @@
+{
+  "name": "Connectome",
+  "short_name": "Connectome",
+  "description": "The daily word-wiring game. Hop between related words to connect one idea to another.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#070913",
+  "theme_color": "#070913",
+  "icons": [{ "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
