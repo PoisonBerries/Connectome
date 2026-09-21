@@ -31,7 +31,7 @@ then push to `main`. All asset paths are relative, so it works under `https://<u
 | Look & feel | `web/js/stage.js`, `map.js`, `css/` | DOM buttons on an SVG synapse layer; canvas constellation of your explored network |
 | Saves & stats | `web/js/store.js` | localStorage only, no accounts, no backend |
 
-**Endless mode (∞):** a random start and target, with 3× par moves to connect them. Reach the target and it becomes your
+**Endless mode (∞):** a random start and target, with 5× par moves to connect them. Reach the target and it becomes your
 next start word with a fresh target and a fresh move budget; run out of moves and the run ends. Par ramps 4 → 8 over the
 first ten links, hints spend moves, and your score is links chained. Rules live in `web/js/endless.js`; targets are drawn
 from the `e` (endpoint pool) list in `graph.json`.

@@ -6,7 +6,7 @@
 
 import { Game } from './game.js';
 
-export const BUDGET_MULT = 3;
+export const BUDGET_MULT = 5;
 
 /** Shortest-route length for a round: 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, ... */
 export const parForRound = (round) => Math.min(8, 4 + Math.floor((round - 1) / 2));
