@@ -26,6 +26,9 @@ ap.add_argument("--diversity", type=float, default=0.30)  # MMR: penalise a link
 ap.add_argument("--bridge", type=int, default=0)  # minimum links that must leave the word's own cluster
 ap.add_argument("--mutual", type=float, default=0.08)  # bonus for links the other word would also make
 ap.add_argument("--clusters", type=int, default=90)
+ap.add_argument("--vectors", choices=["6b", "840b"], default="840b")  # which GloVe release supplies the vectors
+ap.add_argument("--npc", type=int, default=3)  # principal components removed from the vectors
+ap.add_argument("--freqdebias", type=float, default=0.0)  # strength of removing the word-frequency direction
 ap.add_argument("--tag", default="")
 args = ap.parse_args()
 N_COMMON, ALPHA = args.n_common, args.alpha
@@ -50,18 +53,66 @@ FORCE_COMMON = set("apple orange sun moon".split())
 
 d = np.load(os.path.join(RAW, "vectors.npz"))
 tokens = list(d["words"])
-def all_but_the_top(X, n_pc=3):
-    """Mu & Viswanath 2018: centre, then remove the top principal components (frequency / hubness artefacts)."""
+def all_but_the_top(X, n_pc=3, log_rank=None, freq_strength=0.0):
+    """Mu & Viswanath 2018: centre, then remove the top principal components (frequency / hubness artefacts).
+
+    Optionally also remove the direction along which vectors vary with word frequency: rare words otherwise cluster
+    together just for being rare (Oompa Loompa ~ Hobbiton ~ Cruella), which reads as nonsense to a player.
+    """
     X = X - X.mean(axis=0, keepdims=True)
     _, _, vt = np.linalg.svd(X[:30000], full_matrices=False)
     for pc in vt[:n_pc]:
         X = X - np.outer(X @ pc, pc)
+    if freq_strength and log_rank is not None:
+        z = (log_rank - log_rank.mean()) / (log_rank.std() + 1e-9)
+        w = X.T @ z
+        w /= np.linalg.norm(w)
+        X = X - freq_strength * np.outer(X @ w, w)
     return X
 
 
-V_all = normalize(all_but_the_top(normalize(d["vecs"])))
 rank_of = {t: int(r) for t, r in zip(tokens, d["ranks"])}
 idx_of = {t: i for i, t in enumerate(tokens)}
+LOG_RANK = np.log1p(d["ranks"].astype(np.float64))
+
+if args.vectors == "6b":
+    V_low = normalize(all_but_the_top(normalize(d["vecs"]), args.npc, LOG_RANK, args.freqdebias))
+    V_cap = None
+    has_low = np.ones(len(tokens), bool)
+    has_cap = np.zeros(len(tokens), bool)
+else:
+    # GloVe 840B (cased): a lowercase and a Capitalised vector per word, sharing one centring / de-noising transform
+    v8 = np.load(os.path.join(RAW, "vectors840.npz"))
+    assert [str(x) for x in v8["words"]] == tokens, "vectors840.npz is not aligned with vectors.npz"
+    has_low, has_cap = v8["has_low"], v8["has_cap"]
+    low_n = normalize(v8["low"])
+    cap_n = normalize(v8["cap"])
+    fit_rows = has_low & (np.arange(len(tokens)) < 30000)
+    mu = low_n[has_low].mean(axis=0, keepdims=True)
+    _, _, vt = np.linalg.svd((low_n[fit_rows] - mu), full_matrices=False)
+
+    def transform(X):
+        X = X - mu
+        for pc in vt[: args.npc]:
+            X = X - np.outer(X @ pc, pc)
+        return normalize(X)
+
+    V_low = transform(low_n)
+    V_cap = transform(cap_n)
+
+LOWER_SECTIONS = {"common_phrases", "foods", "creatures", "everyday"}  # curated words that are ordinary lowercase words
+
+
+def get_vec(tok, proper):
+    """Normalised vector for a token, or None. Proper nouns prefer the Capitalised vector (Paris, not paris)."""
+    i = idx_of.get(tok)
+    if i is None:
+        return None
+    if proper and has_cap[i]:
+        return V_cap[i]
+    if has_low[i]:
+        return V_low[i]
+    return V_cap[i] if has_cap[i] else None
 forms = load_cased_forms()
 
 
@@ -87,10 +138,11 @@ for line in open(os.path.join(HERE, "proper_nouns.txt"), encoding="utf8"):
 nodes = {}  # key(lower display) -> dict
 missing = []
 for disp, toks, section in curated:
-    if any(t not in idx_of for t in toks):
+    parts = [get_vec(t, section not in LOWER_SECTIONS) for t in toks]
+    if any(p is None for p in parts):
         missing.append(disp)
         continue
-    v = normalize(np.mean([V_all[idx_of[t]] for t in toks], axis=0, keepdims=True))[0]
+    v = normalize(np.mean(parts, axis=0, keepdims=True))[0]
     kind = 2 if section == "common_phrases" else 1
     key = disp.lower()
     if key in DROP or (len(toks) == 1 and (toks[0] in BLOCKLIST or flagged(toks[0]))):
@@ -134,7 +186,7 @@ def category(w):
 common = []
 for t in tokens:
     r = rank_of[t]
-    if r >= 45000:
+    if r >= 45000 or not has_low[idx_of[t]]:
         continue
     if not re.fullmatch(r"[a-z]{3,13}", t):
         continue
@@ -155,7 +207,7 @@ common.sort(key=lambda ft: -ft[0])
 common = [t for _, t in common[:N_COMMON]]
 print("common words:", len(common))
 for t in common:
-    nodes[t] = dict(disp=t, vec=V_all[idx_of[t]], kind=0, rank=rank_of[t], toks=[t], section=category(t))
+    nodes[t] = dict(disp=t, vec=V_low[idx_of[t]], kind=0, rank=rank_of[t], toks=[t], section=category(t))
 
 keys = list(nodes.keys())
 words = [nodes[k]["disp"] for k in keys]

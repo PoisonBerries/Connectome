@@ -49,14 +49,15 @@ Rating tiers run from *Perfect wiring* (par) down to *Tangled*. The share text i
 ```sh
 cd pipeline
 pip install -r requirements.txt
-./download.sh                 # GloVe + fastText word list into raw/ (~1 GB, git-ignored)
-python3 prepare_vectors.py    # extract the vectors we need
+./download.sh                 # GloVe 6B + 840B + fastText word list into raw/ (~3 GB, git-ignored)
+python3 prepare_vectors.py    # word list + ranks from GloVe 6B
+python3 prepare_vectors840.py # the cased GloVe 840B vectors we actually use for similarity
 python3 build.py 6000 1.0     # vocabulary + hub-corrected top-5 neighbour graph -> out/graph.npz
 python3 make_puzzles.py 730   # puzzle calendar -> web/data/
 node ../tests/game.test.mjs   # sanity checks on the shipped data
 ```
 
-Relatedness = cosine similarity of GloVe vectors after "all-but-the-top" post-processing, with a CSLS hub penalty so a
+Relatedness = cosine similarity of GloVe 840B vectors (Common Crawl, cased; Capitalised vectors for proper nouns) after "all-but-the-top" post-processing, with a CSLS hub penalty so a
 few generic words don't appear in everyone's top five. The five links are then chosen for *diversity* (an MMR penalty
 keeps them from being five near-synonyms, which is what pulls in associations like kimchi → Korea) with a small bonus for
 links the other word would return. `pipeline/evaluate.py` compares variants on structure, path length and a simulated
@@ -76,6 +77,6 @@ three steps. `python3 inspect_graph.py pizza Paris Zeus` prints any word's five 
 
 ## Data licences
 
-- [GloVe](https://nlp.stanford.edu/projects/glove/) (Stanford), Public Domain Dedication and License.
+- [GloVe](https://nlp.stanford.edu/projects/glove/) 6B and 840B (Stanford), Public Domain Dedication and License.
 - [fastText wiki-news vectors](https://fasttext.cc/docs/en/english-vectors.html), CC BY-SA 3.0 (only used for capitalisation).
 - WordNet (Princeton), used for filtering.
