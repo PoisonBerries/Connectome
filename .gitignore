@@ -5,3 +5,7 @@ pipeline/__pycache__/
 __pycache__/
 .DS_Store
 node_modules/
+firestore-debug.log
+firebase-debug.log
+ui-debug.log
+.firebase/

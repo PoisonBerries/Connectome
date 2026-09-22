@@ -84,12 +84,19 @@ ever becomes a real problem, the fix is moving the aggregate update into a Cloud
 the actual graph before trusting it.
 
 **Testing the rules:** `tests/firestore.rules.test.mjs` exercises `firestore.rules` against a local emulator (not
-your real project — no credentials touched). It needs Java (the emulator is a JVM process):
+your real project — no credentials touched), and runs as its own check in CI (`.github/workflows/pages.yml`) on every
+push. To run it locally you need Java (the emulator is a JVM process):
 
 ```sh
 npm install
 npm run test:rules
 ```
+
+If `npx firebase ...` crashes with `ERR_REQUIRE_ESM` from inside `universal-analytics`: that package's `0.5.4`
+release (a dependency of `firebase-tools`, used only for its own anonymous CLI telemetry) shipped a broken dependency
+on ESM-only `uuid@14`, while it still uses `require()` itself. `package.json` already pins it back to the last good
+release (`0.5.3`) via `overrides`; a plain `npm install` picks that up. Safe to remove once `firebase-tools` bumps
+past the broken release upstream.
 
 ## Regenerating the data (`pipeline/`)
 
