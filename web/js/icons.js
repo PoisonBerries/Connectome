@@ -20,6 +20,7 @@ const ICONS = {
   compass: '<circle cx="12" cy="12" r="9"/>' + p('M15.8 8.2l-2 5.6-5.6 2 2-5.6z'),
   plasticity: p('M12 21V13M12 13L6.5 5.5M12 13L12 3M12 13L17.5 5.5') + '<circle cx="12" cy="13" r="1.7"/><circle cx="6.5" cy="5.5" r="1.2" fill="currentColor"/><circle cx="12" cy="3" r="1.2" fill="currentColor"/><circle cx="17.5" cy="5.5" r="1.2" fill="currentColor"/>',
   check: p('M5 12.5l4.5 4.5L19 7.5'),
+  dice: '<rect x="4" y="4" width="16" height="16" rx="4.5"/><circle cx="8.2" cy="8.2" r="1.2" fill="currentColor" stroke="none"/><circle cx="15.8" cy="8.2" r="1.2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="8.2" cy="15.8" r="1.2" fill="currentColor" stroke="none"/><circle cx="15.8" cy="15.8" r="1.2" fill="currentColor" stroke="none"/>',
 };
 
 export function icon(name, size = 22) {

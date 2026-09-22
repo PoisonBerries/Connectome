@@ -198,7 +198,7 @@ function renderHud() {
   $('btn-hint').querySelector('span').textContent = g.hintsUsed ? `Hint · ${g.hintsUsed}` : 'Hint';
   document.querySelector('.controls').classList.toggle('over', done);
   $('btn-results').hidden = !done;
-  for (const id of ['btn-undo', 'btn-hint', 'btn-map', 'btn-giveup']) $(id).hidden = done;
+  for (const id of ['btn-undo', 'btn-hint', 'btn-map', 'btn-giveup', 'btn-reroll']) $(id).hidden = done;
   // gently point finished daily players at endless mode until they've tried it
   $('modes').classList.toggle('nudge', !endless && g.over && !state.settings.seenEndless);
 }
@@ -435,6 +435,34 @@ function enterEndless() {
 function newEndlessRun() {
   endlessStore.clearRun();
   enterEndless();
+}
+
+/**
+ * The easy "get me a new round" button: reroll instantly if there's nothing to lose yet (fresh round 1, no hops
+ * made), otherwise confirm first since it discards the current run. Either way it skips straight to a new run
+ * rather than routing through the full results screen — that's the whole point of it being the fast path.
+ */
+function rerollEndless() {
+  const run = state.run;
+  if (frozen()) return; // already over: the results screen's own "Play again" covers this
+  const untouched = run.round === 1 && run.links === 0 && run.game.moves === 0;
+  if (untouched) {
+    newEndlessRun();
+    return;
+  }
+  $('reroll-msg').textContent = run.links
+    ? `You've chained ${run.links}. This ends the current run and locks that in.`
+    : "You're partway through this round. Starting over discards that progress.";
+  openDialog('dlg-reroll');
+}
+
+function confirmReroll() {
+  const run = state.run;
+  run.quit();
+  endlessStore.record(run.links, run.totalHops);
+  endlessStore.clearRun();
+  toast(run.links ? `New run · ${run.links} linked before` : 'New run');
+  newEndlessRun();
 }
 
 function backToDaily() {
@@ -702,6 +730,9 @@ function wireEvents() {
   $('mode-endless').onclick = () => state.mode !== 'endless' && enterEndless();
   $('btn-to-endless').onclick = enterEndless;
   $('ei-go').onclick = () => $('dlg-endless-intro').close();
+  $('btn-reroll').onclick = rerollEndless;
+  $('reroll-no').onclick = () => $('dlg-reroll').close();
+  $('reroll-yes').onclick = () => { $('dlg-reroll').close(); confirmReroll(); };
   $('eo-again').onclick = newEndlessRun;
   $('eo-daily').onclick = backToDaily;
   $('eo-share-btn').onclick = async () => {

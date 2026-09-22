@@ -832,3 +832,9 @@ dialog .row > * { flex: 1; }
   }
   .res-cols + .res-cols { margin-top: 16px; }
 }
+
+/* ------------------------------------------------------------------ endless reroll */
+.mode-row { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.reroll-btn { display: none; }
+body[data-mode='endless'] .reroll-btn { display: inline-grid; }
+.reroll-btn:active { transform: scale(0.92); }

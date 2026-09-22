@@ -44,10 +44,13 @@
     </header>
 
     <main>
-      <div class="modes" id="modes" role="tablist" aria-label="Game mode">
-        <button role="tab" id="mode-daily" aria-selected="true">Daily</button>
-        <button role="tab" id="mode-endless" aria-selected="false">Endless <span aria-hidden="true">∞</span></button>
-        <span class="thumb" aria-hidden="true"></span>
+      <div class="mode-row">
+        <div class="modes" id="modes" role="tablist" aria-label="Game mode">
+          <button role="tab" id="mode-daily" aria-selected="true">Daily</button>
+          <button role="tab" id="mode-endless" aria-selected="false">Endless <span aria-hidden="true">∞</span></button>
+          <span class="thumb" aria-hidden="true"></span>
+        </div>
+        <button class="icon-btn reroll-btn" id="btn-reroll" data-icon="dice" aria-label="Reroll: start a new endless run" hidden></button>
       </div>
 
       <p class="puzzle-meta" id="puzzle-meta"><span id="meta-num"></span><i></i><span id="meta-date"></span></p>
@@ -196,6 +199,16 @@
     <div class="legend">
       <span><i class="dot start"></i>start</span><span><i class="dot path"></i>your path</span>
       <span><i class="dot dead"></i>dead end</span><span><i class="dot seen"></i>seen</span><span><i class="dot goal"></i>target</span>
+    </div>
+  </dialog>
+
+  <!-- Endless reroll -->
+  <dialog id="dlg-reroll" class="sheet" aria-labelledby="reroll-title">
+    <h2 id="reroll-title">Start a new run?</h2>
+    <p class="lede" id="reroll-msg">This ends your current run and locks in what you've chained so far.</p>
+    <div class="row">
+      <button class="btn" id="reroll-no">Keep going</button>
+      <button class="btn danger" id="reroll-yes">New run</button>
     </div>
   </dialog>
 
