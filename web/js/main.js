@@ -1,5 +1,5 @@
 import { loadData, todayNumber, dateOfPuzzle, msUntilNextPuzzle } from './data.js';
-import { Game, GATEWAY_COST, COMPASS_COST, OCTOPUS_COST } from './game.js';
+import { Game, GATEWAY_COST, COMPASS_COST, PLASTICITY_COST } from './game.js';
 import { Stage } from './stage.js';
 import { Ambient } from './ambient.js';
 import { drawConstellation } from './map.js';
@@ -149,7 +149,7 @@ function view() {
   return {
     current: g.current,
     options: frozen() ? [] : g.options,
-    extras: new Set(frozen() ? [] : g.extraOptions), // the octopus's three extra arms
+    extras: new Set(frozen() ? [] : g.extraOptions), // plasticity's three extra links
     target: g.puzzle.target,
     visited: g.visited,
     words: state.world.words,
@@ -334,22 +334,22 @@ function useCompass() {
   toast(`Compass on · ${state.mode === 'endless' ? '−' : '+'}${COMPASS_COST} ${state.mode === 'endless' ? 'moves' : 'hops'}`);
 }
 
-function useOctopus() {
+function usePlasticity() {
   const g = state.game;
   if (frozen()) return;
-  if (g.hasOctopus()) {
-    toast('The octopus already has its arms out here');
+  if (g.hasPlasticity()) {
+    toast('This word has already grown its extra links');
     return;
   }
-  if (!affordable(OCTOPUS_COST)) return;
-  if (!g.octopus()) {
-    toast('No extra arms to grow on this word');
+  if (!affordable(PLASTICITY_COST)) return;
+  if (!g.plasticity()) {
+    toast('No extra links to grow on this word');
     return;
   }
   persist();
   sound.hint();
   render({ animate: true });
-  toast(`Octopus arms out · ${state.mode === 'endless' ? '−' : '+'}${OCTOPUS_COST} ${state.mode === 'endless' ? 'moves' : 'hops'}`);
+  toast(`3 extra links grown · ${state.mode === 'endless' ? '−' : '+'}${PLASTICITY_COST} ${state.mode === 'endless' ? 'moves' : 'hops'}`);
 }
 
 function giveUp() {
@@ -644,10 +644,10 @@ function wireEvents() {
   $('btn-hint').onclick = () => {
     $('hint-gateways').disabled = state.game.gatewaysShown;
     $('hint-compass').disabled = state.game.hasCompass();
-    $('hint-octopus').disabled = state.game.hasOctopus();
-    $('hint-octopus').querySelector('small').textContent = state.game.hasOctopus()
-      ? 'Arms already out on this word. Hop somewhere new to use it again.'
-      : 'Grow three extra arms: the next three most related words.';
+    $('hint-plasticity').disabled = state.game.hasPlasticity();
+    $('hint-plasticity').querySelector('small').textContent = state.game.hasPlasticity()
+      ? 'Already grown for this word. Hop somewhere new to use it again.'
+      : 'Grow three extra links: the next three most related words.';
     $('hint-compass').querySelector('small').textContent = state.game.hasCompass()
       ? 'Already lit for this word. Hop somewhere new to use it again.'
       : 'Light up the options that sit on a shortest route from here.';
@@ -684,7 +684,7 @@ function wireEvents() {
 
   $('hint-gateways').onclick = () => { $('dlg-hint').close(); useGateways(); };
   $('hint-compass').onclick = () => { $('dlg-hint').close(); useCompass(); };
-  $('hint-octopus').onclick = () => { $('dlg-hint').close(); useOctopus(); };
+  $('hint-plasticity').onclick = () => { $('dlg-hint').close(); usePlasticity(); };
   $('giveup-no').onclick = () => $('dlg-giveup').close();
   $('giveup-yes').onclick = () => { $('dlg-giveup').close(); giveUp(); };
 

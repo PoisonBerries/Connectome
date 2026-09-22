@@ -2,7 +2,7 @@
 
 export const GATEWAY_COST = 1;
 export const COMPASS_COST = 2;
-export const OCTOPUS_COST = 2;
+export const PLASTICITY_COST = 2;
 
 export class Game {
   constructor(world, puzzle, saved = null) {
@@ -15,7 +15,7 @@ export class Game {
     this.visited = new Set([puzzle.start]);
     this.gatewaysShown = false;
     this.compassUses = 0; // paid uses
-    this.octopusNodes = new Set(); // words where the octopus has grown its three extra arms (once per word)
+    this.plasticityNodes = new Set(); // words that have grown their three extra arms (once per word)
     this.compassNodes = new Set(); // words the compass has been used on (it is only ever bought once per word)
     this.status = 'playing'; // playing | won | gaveup
     this.revealed = null; // optimal path shown after giving up
@@ -29,20 +29,20 @@ export class Game {
   get options() {
     return this.optionsAt(this.current);
   }
-  /** Where you can hop from a word: its five links, plus three more if the octopus has been used there. */
+  /** Where you can hop from a word: its five links, plus three more once plasticity has grown them. */
   optionsAt(node) {
     const base = this.world.neighbors(node);
-    return this.octopusNodes.has(node) ? [...base, ...this.world.extras(node)] : base;
+    return this.plasticityNodes.has(node) ? [...base, ...this.world.extras(node)] : base;
   }
-  /** The octopus's extra options on the current word (empty until it is used). */
+  /** The three extra options plasticity has grown on the current word (empty until it is used). */
   get extraOptions() {
-    return this.octopusNodes.has(this.current) ? this.world.extras(this.current) : [];
+    return this.plasticityNodes.has(this.current) ? this.world.extras(this.current) : [];
   }
   get moves() {
     return this.hops.length;
   }
   get penalty() {
-    return (this.gatewaysShown ? GATEWAY_COST : 0) + this.compassUses * COMPASS_COST + this.octopusNodes.size * OCTOPUS_COST;
+    return (this.gatewaysShown ? GATEWAY_COST : 0) + this.compassUses * COMPASS_COST + this.plasticityNodes.size * PLASTICITY_COST;
   }
   get score() {
     return this.moves + this.penalty;
@@ -51,7 +51,7 @@ export class Game {
     return this.status !== 'playing';
   }
   get hintsUsed() {
-    return (this.gatewaysShown ? 1 : 0) + this.compassUses + this.octopusNodes.size;
+    return (this.gatewaysShown ? 1 : 0) + this.compassUses + this.plasticityNodes.size;
   }
   /** Distance from the current word to the target along the best route. */
   get remaining() {
@@ -99,14 +99,14 @@ export class Game {
     return this.world.gateways(this.puzzle.target);
   }
 
-  hasOctopus(node = this.current) {
-    return this.octopusNodes.has(node);
+  hasPlasticity(node = this.current) {
+    return this.plasticityNodes.has(node);
   }
 
-  /** Grow three extra arms: the next three most related words become hop options. Once per word. */
-  octopus() {
-    if (this.over || this.hasOctopus() || this.world.extras(this.current).length === 0) return false;
-    this.octopusNodes.add(this.current);
+  /** Grow three extra links: the next three most related words become hop options. Once per word. */
+  plasticity() {
+    if (this.over || this.hasPlasticity() || this.world.extras(this.current).length === 0) return false;
+    this.plasticityNodes.add(this.current);
     return true;
   }
 
@@ -156,7 +156,7 @@ export class Game {
       gateways: this.gatewaysShown,
       compass: this.compassUses,
       compassAt: words([...this.compassNodes]),
-      octopusAt: words([...this.octopusNodes]),
+      plasticityAt: words([...this.plasticityNodes]),
       status: this.status,
       revealed: this.revealed ? words(this.revealed) : null,
     };
@@ -168,7 +168,7 @@ export class Game {
     const ids = (arr) => (Array.isArray(arr) ? arr.map((x) => idx.get(x)) : null);
     const path = ids(s.path);
     if (!path || path.some((x) => x === undefined) || path[0] !== this.puzzle.start) return;
-    this.octopusNodes = new Set((ids(s.octopusAt) || []).filter((x) => x !== undefined));
+    this.plasticityNodes = new Set((ids(s.plasticityAt) || []).filter((x) => x !== undefined));
 
     // keep the longest prefix of the saved path that is still a valid chain in this build of the graph
     let keep = 1;

@@ -797,7 +797,7 @@ dialog .row > * { flex: 1; }
 .route-label { margin-top: 10px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
 .route-label:first-child { margin-top: 4px; }
 
-/* ------------------------------------------------------------------ octopus arms */
+/* ------------------------------------------------------------------ plasticity's extra links */
 .stage.dense .node { font-size: 15px; padding: 8px 13px; }
 .stage.dense .node.long { font-size: 13.5px; padding: 7px 11px; }
 .stage.dense .node.current { font-size: 15px; }
@@ -810,5 +810,5 @@ dialog .row > * { flex: 1; }
   box-shadow: 0 0 0 4px rgba(var(--start-rgb), 0.16), 0 8px 28px rgba(0, 0, 0, 0.3), 0 0 36px rgba(var(--start-rgb), 0.5);
 }
 .syn.base.extra { stroke: var(--start); stroke-dasharray: 5 6; }
-.hint-opt#hint-octopus .hi { color: var(--start); }
-.hint-opt#hint-octopus em { color: var(--start); }
+.hint-opt#hint-plasticity .hi { color: var(--start); }
+.hint-opt#hint-plasticity em { color: var(--start); }

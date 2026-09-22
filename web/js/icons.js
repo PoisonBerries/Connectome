@@ -18,7 +18,7 @@ const ICONS = {
   'chevron-right': p('M9.5 6l6 6-6 6'),
   target: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor"/>',
   compass: '<circle cx="12" cy="12" r="9"/>' + p('M15.8 8.2l-2 5.6-5.6 2 2-5.6z'),
-  octopus: p('M6.5 12a5.5 5.5 0 0 1 11 0v1.4M6.5 12v1.4M6.5 13.4c0 2.6-2.5 2.6-2.5 5.4M9.5 14c0 2.8-1 3.4-1 5.7M12 14.2V20M14.5 14c0 2.8 1 3.4 1 5.7M17.5 13.4c0 2.6 2.5 2.6 2.5 5.4') + '<circle cx="10" cy="10.3" r=".7" fill="currentColor"/><circle cx="14" cy="10.3" r=".7" fill="currentColor"/>',
+  plasticity: p('M12 21V13M12 13L6.5 5.5M12 13L12 3M12 13L17.5 5.5') + '<circle cx="12" cy="13" r="1.7"/><circle cx="6.5" cy="5.5" r="1.2" fill="currentColor"/><circle cx="12" cy="3" r="1.2" fill="currentColor"/><circle cx="17.5" cy="5.5" r="1.2" fill="currentColor"/>',
   check: p('M5 12.5l4.5 4.5L19 7.5'),
 };
 

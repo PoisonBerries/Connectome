@@ -103,7 +103,7 @@ export class Stage {
       const pts = ANGLES.map((a) => ({ x: cx + Math.cos(a) * rx, y: cy + Math.sin(a) * ry }));
       return { cx, cy, pts };
     }
-    // the octopus's eight arms: an even ring on a tall ellipse, rotated so no bubble sits on the far left/right edge
+    // plasticity's eight-link ring: an even layout on a tall ellipse, rotated so no bubble sits on the far left/right edge
     const rx = clamp(W * 0.375, 96, 260);
     const ry = clamp(H * 0.425, 108, 230);
     const pts = Array.from({ length: n }, (_, i) => {
@@ -145,7 +145,7 @@ export class Stage {
       k.setAttribute('aria-hidden', 'true');
       el.appendChild(k);
       const bits = [word, `option ${spec.rank + 1}`];
-      if (view.extras && view.extras.has(id)) bits.push('octopus arm');
+      if (view.extras && view.extras.has(id)) bits.push('grown by plasticity');
       if (id === view.target) bits.push('the target');
       else if (view.visited.has(id)) bits.push('already visited');
       el.setAttribute('aria-label', bits.join(', '));
