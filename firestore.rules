@@ -76,8 +76,14 @@ service cloud.firestore {
     match /puzzleStats/{puzzleId} {
       allow read: if isSignedIn();
       allow delete: if false;
+      // A fresh doc's histogram/route maps must have exactly as many keys as its win count (0 for a first-ever
+      // loss, 1 for a first-ever win) — this is what actually catches a client sending a malformed nested field
+      // (e.g. a literal "hist.5" field instead of a real hist map), which isValidStats alone can't see, since a
+      // missing/wrong-shaped map still passes the loose "is a map" check via mapf()'s default.
       allow create: if isSignedIn() && hasPlayRecord(puzzleId) && isValidStats(request.resource.data)
-        && num(request.resource.data, 'attempts') <= 1 && num(request.resource.data, 'count') <= 1;
+        && num(request.resource.data, 'attempts') <= 1 && num(request.resource.data, 'count') <= 1
+        && mapf(request.resource.data, 'hist').size() == num(request.resource.data, 'count')
+        && mapf(request.resource.data, 'paths').size() == num(request.resource.data, 'count');
       allow update: if isSignedIn() && hasPlayRecord(puzzleId) && isValidStats(request.resource.data)
         && isPlausibleDelta(resource.data, request.resource.data);
     }

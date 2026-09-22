@@ -61,23 +61,49 @@ try {
   let snap = await getDoc(doc(alice.firestore(), stats(10)));
   ok('the fresh aggregate has attempts=1, count=0 (no field at all)', snap.data().attempts === 1 && snap.data().count === undefined);
 
+  // Note the write style below: updateDoc() with a dotted string key ("hist.7") is what actually merges into one
+  // key of an existing nested map without disturbing its siblings. setDoc(...,{merge:true}) does NOT parse a dotted
+  // string key the same way — it stores a literal field named "hist.7" — so it's only used below for the one case
+  // where that's actually correct (creating the very first entry in a map that doesn't exist yet, nothing to
+  // preserve). Using the wrong one of the two for an update is exactly the bug this whole aggregate design had
+  // until it was caught by testing against the real project: see the "malformed update" checks further down.
   await createPlay(bob, 'bob', 10, { won: true, score: 7 });
   ok('a second, different user can add a win on top of a loss-only aggregate', await succeeds(
-    setDoc(doc(bob.firestore(), stats(10)), { attempts: increment(1), count: increment(1), sumScore: increment(7), 'hist.7': increment(1), 'paths.Loki%7Cgods%7CRamadan': increment(1) }, { merge: true })
+    updateDoc(doc(bob.firestore(), stats(10)), { attempts: increment(1), count: increment(1), sumScore: increment(7), 'hist.7': increment(1), 'paths.Loki%7Cgods%7CRamadan': increment(1) })
   ));
   snap = await getDoc(doc(bob.firestore(), stats(10)));
-  ok('aggregate now reflects both finishes', snap.data().attempts === 2 && snap.data().count === 1 && snap.data().sumScore === 7);
+  ok('aggregate now reflects both finishes, with a real nested hist map', snap.data().attempts === 2 && snap.data().count === 1 && snap.data().sumScore === 7 && snap.data().hist?.['7'] === 1);
 
   ok('cannot jump attempts by more than 1 in a single write', await fails(
-    setDoc(doc(bob.firestore(), stats(10)), { attempts: increment(5) }, { merge: true })
+    updateDoc(doc(bob.firestore(), stats(10)), { attempts: increment(5) })
   ));
   ok('cannot touch two histogram buckets in one write', await fails(
-    setDoc(doc(bob.firestore(), stats(10)), { attempts: increment(1), count: increment(1), sumScore: increment(5), 'hist.5': increment(1), 'hist.6': increment(1), 'paths.x': increment(1) }, { merge: true })
+    updateDoc(doc(bob.firestore(), stats(10)), { attempts: increment(1), count: increment(1), sumScore: increment(5), 'hist.5': increment(1), 'hist.6': increment(1), 'paths.x': increment(1) })
   ));
   ok('cannot record a win without also updating sumScore/hist/paths', await fails(
-    setDoc(doc(bob.firestore(), stats(10)), { attempts: increment(1), count: increment(1) }, { merge: true })
+    updateDoc(doc(bob.firestore(), stats(10)), { attempts: increment(1), count: increment(1) })
   ));
   ok('cannot delete an aggregate', await fails(deleteDoc(doc(bob.firestore(), stats(10)))));
+
+  // ---- the malformed-update bug, kept as a regression test: writing a dotted key via setDoc+merge instead of
+  // updateDoc() produces a literal "hist.9" field rather than a real hist map, which the rules correctly reject
+  // once the doc already exists (they can't tell it apart from tampering — that's the point).
+  const carol = env.authenticatedContext('carol');
+  await createPlay(carol, 'carol', 10, { won: true, score: 9 });
+  ok('a malformed dotted-key write via setDoc+merge against an EXISTING doc is rejected, not silently wrong', await fails(
+    setDoc(doc(carol.firestore(), stats(10)), { attempts: increment(1), count: increment(1), sumScore: increment(9), 'hist.9': increment(1), 'paths.x': increment(1) }, { merge: true })
+  ));
+
+  // ---- the same bug, but on a brand-new puzzle (a create): a flat "hist.5" field isn't a size-1 hist map, so the
+  // create-time shape check added after this bug was found catches it too.
+  const dave = env.authenticatedContext('dave');
+  await createPlay(dave, 'dave', 60, { won: true, score: 5 });
+  ok('a malformed dotted-key write via setDoc+merge on a FRESH puzzle is also rejected', await fails(
+    setDoc(doc(dave.firestore(), stats(60)), { attempts: increment(1), count: increment(1), sumScore: increment(5), 'hist.5': increment(1), 'paths.x': increment(1) }, { merge: true })
+  ));
+  ok('the correctly-shaped create for that same fresh puzzle succeeds', await succeeds(
+    setDoc(doc(dave.firestore(), stats(60)), { attempts: increment(1), count: increment(1), sumScore: increment(5), hist: { 5: increment(1) }, paths: { x: increment(1) } }, { merge: true })
+  ));
 
   // ---- reads
   ok('reading the public aggregate requires only being signed in', await succeeds(getDoc(doc(alice.firestore(), stats(10)))));

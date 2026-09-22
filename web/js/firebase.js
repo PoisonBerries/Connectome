@@ -15,16 +15,16 @@
 
 const SDK = 'https://www.gstatic.com/firebasejs/12.19.0';
 const HIST_CAP = 40;
-const TIMEOUT_MS = 4000;
+const TIMEOUT_MS = 8000; // generous: this never blocks the UI, and a first-ever visit pays for SDK load + auth + write
 
 // Public web config: safe to ship in client code (Firebase enforces access via security rules, not by hiding this).
 // apiKey / appId come from Firebase console -> Project settings -> General -> Your apps -> Web app.
 const firebaseConfig = {
-  apiKey: 'REPLACE_ME',
+  apiKey: 'AIzaSyAcg0t8cO10raPNmZv0cxk2pTKCnc3FKgY',
   authDomain: 'connectome-53d32.firebaseapp.com',
   projectId: 'connectome-53d32',
   storageBucket: 'connectome-53d32.firebasestorage.app',
-  appId: 'REPLACE_ME',
+  appId: '1:989973318837:web:037503419ddcf7e230c2fc',
 };
 
 let readyPromise = null;
@@ -83,18 +83,41 @@ export async function submitDailyResult(puzzleNum, { score, par, won, path }) {
     const { fsMod, db, uid } = await load();
     const playRef = fsMod.doc(db, 'plays', `${puzzleNum}_${uid}`);
     const statsRef = fsMod.doc(db, 'puzzleStats', String(puzzleNum));
-    const update = { attempts: fsMod.increment(1) };
-    if (won) {
-      const bucket = Math.min(score, HIST_CAP);
-      update.count = fsMod.increment(1);
-      update.sumScore = fsMod.increment(score);
-      update[`hist.${bucket}`] = fsMod.increment(1);
-      update[`paths.${pathKey(path)}`] = fsMod.increment(1);
-    }
+    const bucket = Math.min(score, HIST_CAP);
+    const key = pathKey(path);
+
     await withTimeout(
       fsMod.setDoc(playRef, { puzzle: puzzleNum, uid, score, par, won, path, ts: fsMod.serverTimestamp() })
     );
-    await withTimeout(fsMod.setDoc(statsRef, update, { merge: true }));
+
+    // updateDoc() parses a dotted string key ("hist.5") as a real nested-field path, merging into just that one key
+    // without disturbing any other bucket already there. setDoc(...,{merge:true}) does NOT do this for a plain
+    // string key — it would store a literal field literally named "hist.5" — so it's only safe to use as the
+    // create-time fallback below, where hist/paths don't exist yet and there's nothing to accidentally clobber.
+    const dotted = { attempts: fsMod.increment(1) };
+    if (won) {
+      dotted.count = fsMod.increment(1);
+      dotted.sumScore = fsMod.increment(score);
+      dotted[`hist.${bucket}`] = fsMod.increment(1);
+      dotted[`paths.${key}`] = fsMod.increment(1);
+    }
+    try {
+      // updateDoc() requires the doc to already exist; on a fresh puzzle nobody has finished yet, Firestore's rules
+      // evaluate this as an update against a nonexistent resource and it comes back as permission-denied, not some
+      // more specific "not found" code — so there's no reliable way to distinguish "doesn't exist yet" from a real
+      // rejection other than trying the create-shaped write next and letting IT fail on its own if something is
+      // actually wrong.
+      await withTimeout(fsMod.updateDoc(statsRef, dotted));
+    } catch {
+      const fresh = { attempts: fsMod.increment(1) };
+      if (won) {
+        fresh.count = fsMod.increment(1);
+        fresh.sumScore = fsMod.increment(score);
+        fresh.hist = { [bucket]: fsMod.increment(1) };
+        fresh.paths = { [key]: fsMod.increment(1) };
+      }
+      await withTimeout(fsMod.setDoc(statsRef, fresh, { merge: true }));
+    }
     return true;
   } catch (e) {
     console.warn('[connectome] could not record community stats:', e && e.message);
