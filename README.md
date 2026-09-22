@@ -34,15 +34,18 @@ then push to `main`. All asset paths are relative, so it works under `https://<u
 
 **Endless mode (∞):** a random start and target, with 5× min moves to connect them. Reach the target and it becomes your
 next start word with a fresh target and a fresh move budget; run out of moves and the run ends. Min ramps 4 → 8 over the
-first ten links, hints spend moves, and your score is links chained. Rules live in `web/js/endless.js`; targets are drawn
-from the `e` (endpoint pool) list in `graph.json`.
+first ten links, hints spend moves, and your score is links chained. The free step back and each hint are single-use
+per round rather than per puzzle, resetting whenever you reach a target and a new round begins. Rules live in
+`web/js/endless.js`; targets are drawn from the `e` (endpoint pool) list in `graph.json`.
 
-**Scoring (daily):** hops = every forward move (dead ends count; stepping back is free). Hints add to that, cheapest
-first: *Plasticity* +1 (grows 3 extra links on the current word: the next 3 most related words after its usual five,
-from `graph.json`'s `x` field), *Gateways* +2 (shows every word that links straight to the target), *Compass* +3
-(highlights options on a shortest route).
-Every hint is a one-time purchase per word — using it again on a word you already paid for is free, since it would just
-show the same thing. Rating tiers run from *Perfect wiring* (min) down to *Tangled*. The share text is spoiler-free:
+**Scoring (daily):** hops = every forward move (dead ends count). Hints add to that, cheapest first: *Plasticity* +1
+(grows 3 extra links on the current word: the next 3 most related words after its usual five, from `graph.json`'s `x`
+field), *Compass* +3 (highlights options on a shortest route), *Gateways* +5 (shows every word that links straight to
+the target).
+Stepping back — the Back button, or jumping to an earlier word in the trail — is free, and each hint is a one-time
+purchase, but both are single-use per puzzle: once you've spent your one free step back, or bought a given hint, it's
+gone for the rest of that puzzle (buying it again on the same word you already paid for would just show the same
+thing anyway). Rating tiers run from *Perfect wiring* (min) down to *Tangled*. The share text is spoiler-free:
 🟩 closer · 🟨 sideways · 🟥 farther.
 
 **Difficulty curve:** min is 5 on Monday/Tuesday, 6 on Wed/Thu, 7 on Fri/Sat, 8 on Sunday. A simple simulated

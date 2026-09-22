@@ -51,13 +51,15 @@ assert.equal(game.score, pz.min);
 assert.equal(tierIndex(game.score, pz.min), 0);
 assert.deepEqual(game.hopTrend(), Array(pz.min).fill(1));
 
-// undo is free but hops stay counted; hints add penalty
+// undo is free but hops stay counted, and only once per puzzle; hints add penalty
 const g2 = new Game(w, pz);
 const first = g2.options[0];
 g2.hop(first); g2.undo();
 assert.equal(g2.moves, 1); assert.equal(g2.path.length, 1);
+assert(!g2.canUndo(), 'undo is single-use per puzzle');
+assert(!g2.undo(), 'a second undo is refused, even with more path to undo');
 g2.compass(); g2.showGateways();
-assert.equal(g2.score, 1 + 3 + 2); // compass=3, gateway=2
+assert.equal(g2.score, 1 + 3 + 5); // compass=3, gateway=5
 assert(g2.hop(w.neighbors(g2.current).find((n) => !g2.visited.has(n))));
 
 // save / restore round trip
@@ -73,7 +75,7 @@ const tiers = [6, 7, 9, 10, 15, 16, 21, 22, 30, 31].map((sc) => tierIndex(sc, 6)
 assert.deepEqual(tiers, [0, 1, 1, 2, 2, 3, 3, 4, 4, 5]);
 assert.equal(tierIndex(8, 5), 1); assert.equal(tierIndex(12, 8), 1); assert.equal(tierIndex(13, 8), 2);
 
-// compass: bought once per word, free when you come back to it, remembered across saves
+// compass: single-use per puzzle/round (not per word), stays lit if you come back to the word it was used on
 {
   const gc = new Game(w, w.puzzleFor(2));
   const startWord = gc.current;
@@ -83,16 +85,16 @@ assert.equal(tierIndex(8, 5), 1); assert.equal(tierIndex(12, 8), 1); assert.equa
   assert.equal(gc.penalty, 3, 'charged once');
   assert(gc.compassOptions().length >= 1);
   gc.hop(gc.options[0]);
-  assert(!gc.hasCompass(), 'a new word has no compass yet');
-  assert(gc.compass(), 'a different word can use it');
-  assert.equal(gc.penalty, 6);
+  assert(!gc.hasCompass(), 'a new word has no compass lit');
+  assert(!gc.compass(), 'compass is already spent this puzzle, even on a new word');
+  assert.equal(gc.penalty, 3, 'no extra charge for the refused reuse');
+  assert(gc.canUndo(), 'stepping back is a separate, still-unused charge');
   gc.undo();
   assert.equal(gc.current, startWord);
-  assert(gc.hasCompass(), 'coming back to a paid-for word keeps its compass');
-  assert(!gc.compass());
-  assert.equal(gc.penalty, 6, 'no extra charge for revisiting');
+  assert(gc.hasCompass(), 'coming back to the paid-for word keeps its compass lit');
+  assert(!gc.canUndo(), 'stepping back was single-use and is now spent');
   const back = new Game(w, w.puzzleFor(2), JSON.parse(JSON.stringify(gc.serialize())));
-  assert(back.hasCompass(startWord) && back.penalty === 6, 'compass words survive save/restore');
+  assert(back.hasCompass(startWord) && back.penalty === 3 && !back.canUndo(), 'compass and spent undo survive save/restore');
 }
 
 console.log('date of #1:', dateOfPuzzle(w, 1).toDateString(), '| today is #', todayNumber(w));
@@ -167,10 +169,30 @@ console.log('all game logic checks passed');
   const h = new EndlessRun(w, { rand });
   assert(h.canAfford(3));
   assert(h.game.compass(), 'first compass works');
-  assert(!h.game.compass(), 'a second compass on the same word does nothing');
+  assert(!h.game.compass(), 'a second compass this round does nothing, even on a new word');
   const spent = h.left;
   assert.equal(spent, h.budget - 3, 'and costs nothing extra');
   assert(!h.canAfford(spent), 'a hint may not consume the final move');
+
+  // single-use hints and undo reset every round, since each round gets a fresh Game
+  {
+    const e = new EndlessRun(w, { rand });
+    e.hop(e.game.options[0]);
+    assert(e.game.canUndo(), 'undo usable in round 1');
+    e.game.undo();
+    assert(!e.game.canUndo(), 'undo spent for the rest of round 1');
+    assert(e.game.compass(), 'compass usable in round 1');
+    assert(!e.game.compass(), 'compass spent for the rest of round 1');
+
+    const route = w.shortestPath(e.game.current, e.game.puzzle.target);
+    for (const step of route.slice(1)) e.hop(step);
+    assert(e.advance(), 'round 1 won, round 2 begins');
+
+    e.hop(e.game.options[0]);
+    assert(e.game.canUndo(), 'undo is usable again in round 2');
+    assert(e.game.compass(), 'compass is usable again in round 2');
+    console.log('single-use hint/undo round-reset checks passed');
+  }
 
   // save / restore, including mid-celebration
   const a = new EndlessRun(w, { rand });
@@ -222,7 +244,7 @@ console.log('all game logic checks passed');
   console.log('saves survive graph rebuilds');
 }
 
-// ---- plasticity hint: 3 extra links, once per word, saved/restored, folded into score and the discovered/map sets
+// ---- plasticity hint: 3 extra links, single-use per puzzle/round, saved/restored, folded into score and the discovered/map sets
 {
   const gc = new Game(w, w.puzzleFor(3));
   const startWord = gc.current;
@@ -241,15 +263,18 @@ console.log('all game logic checks passed');
     assert(gc.hop(other));
     assert(!gc.hasPlasticity(), 'the new word has no arms grown yet');
     assert.equal(gc.options.length, 5, 'the new word starts with just its 5 links');
+    assert(!gc.plasticity(), 'plasticity is already spent this puzzle, even on a new word');
 
+    assert(gc.canUndo(), 'stepping back is a separate, still-unused charge');
     gc.undo();
     assert.equal(gc.current, startWord);
     assert(gc.hasPlasticity(), 'coming back keeps the arms out');
     assert.equal(gc.options.length, 5 + extrasBefore.length, 'still 8 options, for free');
     assert.equal(gc.penalty, 1, 'no extra charge for revisiting');
+    assert(!gc.canUndo(), 'stepping back was single-use and is now spent');
 
     const back = new Game(w, w.puzzleFor(3), JSON.parse(JSON.stringify(gc.serialize())));
-    assert(back.hasPlasticity(startWord) && back.options.length === 5 + extrasBefore.length, 'arms survive save/restore');
+    assert(back.hasPlasticity(startWord) && back.options.length === 5 + extrasBefore.length && !back.canUndo(), 'arms and spent undo survive save/restore');
   }
   // a word with no extras (rare, but the API must not lie about it)
   let noExtra = null;

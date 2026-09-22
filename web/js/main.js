@@ -155,7 +155,7 @@ function view() {
     target: g.puzzle.target,
     visited: g.visited,
     words: state.world.words,
-    compass: g.hasCompass() ? new Set(g.compassOptions()) : null, // paid for once per word; returns free when you revisit it
+    compass: g.hasCompass() ? new Set(g.compassOptions()) : null, // stays lit here if this is the word it was used on
   };
 }
 
@@ -324,8 +324,8 @@ function useGateways() {
 function useCompass() {
   const g = state.game;
   if (frozen()) return;
-  if (g.hasCompass()) {
-    toast('The compass is already lit for this word');
+  if (g.compassNodes.size > 0) {
+    toast(`The compass is already used up for ${state.mode === 'endless' ? 'this round' : 'this puzzle'}`);
     return;
   }
   if (!affordable(COMPASS_COST)) return;
@@ -339,8 +339,8 @@ function useCompass() {
 function usePlasticity() {
   const g = state.game;
   if (frozen()) return;
-  if (g.hasPlasticity()) {
-    toast('This word has already grown its extra links');
+  if (g.plasticityNodes.size > 0) {
+    toast(`Plasticity is already used up for ${state.mode === 'endless' ? 'this round' : 'this puzzle'}`);
     return;
   }
   if (!affordable(PLASTICITY_COST)) return;
@@ -707,14 +707,16 @@ function wireEvents() {
   $('btn-settings').onclick = openSettings;
   $('btn-undo').onclick = undo;
   $('btn-hint').onclick = () => {
-    $('hint-gateways').disabled = state.game.gatewaysShown;
-    $('hint-compass').disabled = state.game.hasCompass();
-    $('hint-plasticity').disabled = state.game.hasPlasticity();
-    $('hint-plasticity').querySelector('small').textContent = state.game.hasPlasticity()
-      ? 'Already grown for this word. Hop somewhere new to use it again.'
+    const g = state.game;
+    const spent = state.mode === 'endless' ? 'this round' : 'this puzzle';
+    $('hint-gateways').disabled = g.gatewaysShown;
+    $('hint-compass').disabled = g.compassNodes.size > 0;
+    $('hint-plasticity').disabled = g.plasticityNodes.size > 0;
+    $('hint-plasticity').querySelector('small').textContent = g.plasticityNodes.size > 0
+      ? `Already used up for ${spent}.`
       : 'Grow three extra links: the next three most related words.';
-    $('hint-compass').querySelector('small').textContent = state.game.hasCompass()
-      ? 'Already lit for this word. Hop somewhere new to use it again.'
+    $('hint-compass').querySelector('small').textContent = g.compassNodes.size > 0
+      ? `Already used up for ${spent}.`
       : 'Light up the options that sit on a shortest route from here.';
     openDialog('dlg-hint');
   };

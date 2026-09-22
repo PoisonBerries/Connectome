@@ -1,7 +1,7 @@
 // Game state machine. No DOM in here, so it can be reasoned about (and tested) on its own.
 
 export const PLASTICITY_COST = 1;
-export const GATEWAY_COST = 2;
+export const GATEWAY_COST = 5;
 export const COMPASS_COST = 3;
 
 export class Game {
@@ -14,9 +14,10 @@ export class Game {
     this.hops = []; // every forward move ever made: {from, to, before, after}  (dead ends included)
     this.visited = new Set([puzzle.start]);
     this.gatewaysShown = false;
-    this.compassUses = 0; // paid uses
-    this.plasticityNodes = new Set(); // words that have grown their three extra arms (once per word)
-    this.compassNodes = new Set(); // words the compass has been used on (it is only ever bought once per word)
+    this.compassUses = 0; // paid uses (0 or 1: compass is single-use per puzzle/round now)
+    this.plasticityNodes = new Set(); // the (at most one) word that has grown its three extra arms
+    this.compassNodes = new Set(); // the (at most one) word the compass has been used on
+    this.undoUsed = false; // stepping back (Back button or a trail-chip jump) is free, but only once per puzzle/round
     this.status = 'playing'; // playing | won | gaveup
     this.revealed = null; // optimal path shown after giving up
 
@@ -77,19 +78,22 @@ export class Game {
   }
 
   canUndo() {
-    return !this.over && this.path.length > 1;
+    return !this.over && !this.undoUsed && this.path.length > 1;
   }
 
-  /** Stepping back is free; the hop you spent still counts. */
+  /** Stepping back is free, but only once per puzzle (once per round in endless); the hops you made still count. */
   undo(steps = 1) {
     if (!this.canUndo()) return false;
     this.path.splice(Math.max(1, this.path.length - steps));
+    this.undoUsed = true;
     return true;
   }
 
+  /** A trail-chip jump is the same capability as Back (moving backward for free), so it spends the same charge. */
   jumpTo(pathIndex) {
-    if (this.over || pathIndex < 0 || pathIndex >= this.path.length - 1) return false;
+    if (this.over || this.undoUsed || pathIndex < 0 || pathIndex >= this.path.length - 1) return false;
     this.path.splice(pathIndex + 1);
+    this.undoUsed = true;
     return true;
   }
 
@@ -103,9 +107,9 @@ export class Game {
     return this.plasticityNodes.has(node);
   }
 
-  /** Grow three extra links: the next three most related words become hop options. Once per word. */
+  /** Grow three extra links: the next three most related words become hop options. Once per puzzle/round. */
   plasticity() {
-    if (this.over || this.hasPlasticity() || this.world.extras(this.current).length === 0) return false;
+    if (this.over || this.plasticityNodes.size > 0 || this.world.extras(this.current).length === 0) return false;
     this.plasticityNodes.add(this.current);
     return true;
   }
@@ -121,9 +125,9 @@ export class Game {
     return this.options.filter((n) => d[n] === d[this.current] - 1);
   }
 
-  /** Light up the best next hops. Costs a penalty once per word; returns false if it was already used here. */
+  /** Light up the best next hops. Once per puzzle/round; returns false if it's already been used anywhere. */
   compass() {
-    if (this.over || this.hasCompass()) return false;
+    if (this.over || this.compassNodes.size > 0) return false;
     this.compassUses += 1;
     this.compassNodes.add(this.current);
     return true;
@@ -157,6 +161,7 @@ export class Game {
       compass: this.compassUses,
       compassAt: words([...this.compassNodes]),
       plasticityAt: words([...this.plasticityNodes]),
+      undo: this.undoUsed,
       status: this.status,
       revealed: this.revealed ? words(this.revealed) : null,
     };
@@ -185,6 +190,7 @@ export class Game {
     this.gatewaysShown = !!s.gateways;
     this.compassUses = s.compass | 0;
     this.compassNodes = new Set((ids(s.compassAt) || []).filter((x) => x !== undefined));
+    this.undoUsed = !!s.undo;
     const revealed = ids(s.revealed);
     this.revealed = revealed && revealed.every((x) => x !== undefined) ? revealed : null;
     this.status = ['playing', 'won', 'gaveup'].includes(s.status) ? s.status : 'playing';
