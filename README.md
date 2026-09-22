@@ -114,7 +114,7 @@ pip install -r requirements.txt
 ./download.sh                 # GloVe 6B + 840B + fastText word list into raw/ (~3 GB, git-ignored)
 python3 prepare_vectors.py    # word list + ranks from GloVe 6B
 python3 prepare_vectors840.py # the cased GloVe 840B vectors we actually use for similarity
-python3 build.py 6000 1.0     # vocabulary + hub-corrected top-5 neighbour graph -> out/graph.npz
+python3 build.py 6000 1.0 --anchor 0.3  # vocabulary + hub-corrected top-5 neighbour graph -> out/graph.npz
 python3 make_puzzles.py 730   # puzzle calendar -> web/data/
 node ../tests/game.test.mjs   # sanity checks on the shipped data
 ```
@@ -128,6 +128,14 @@ Each endpoint also gets an *approachability* score (how often a simple navigator
 near-unreachable targets. Inflections and obvious relatives (dog/dogs, photo/photograph)
 are never offered as neighbours. Proper nouns come from a hand-curated list (`proper_nouns.txt`) rather than the
 news-heavy raw corpus, and profanity, slurs, and graphic-violence terms are excluded (`lexicon.py`).
+A raw GloVe vector for a curated proper noun blends *every* sense of that surface form by how often each occurs in
+Common Crawl text, so a minority sense (Bosch the painter) can lose out to a majority one (Bosch the auto-parts/
+appliance brand) and pull in nonsense neighbours (Roomba, a grinder). `--anchor` corrects only the outliers: for
+each curated word, if its raw vector sits unusually far from the average of its own curated section (below the
+section's 10th-60th percentile of similarity-to-centroid), it's pulled proportionally toward that average; words
+already sitting comfortably in their section (most of them) are left untouched so genuine cross-topic bridges
+survive. A flat pull on every curated word was tried first and fixed the same words, but indiscriminately dragging
+well-placed ones too cost 10-25 points of simulated solve rate in `evaluate.py`; the outlier-only version costs ~3.
 Endpoint words carry a **theme** (place, people, fiction, brand, food, animal, object, nature, ...). Puzzles and endless
 targets are drawn theme-first, and a start and target never share a theme, so there is no "Paris → Austria". Re-running
 `make_puzzles.py` keeps every already-published puzzle (through launch day) and only regenerates the future ones.

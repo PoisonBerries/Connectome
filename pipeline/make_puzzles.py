@@ -125,9 +125,12 @@ EPOCH_OUT = EPOCH - dt.timedelta(days=PAST_DAYS)
 TOTAL = PAST_DAYS + N_DAYS
 puzzles = [None] * TOTAL
 
-# Puzzles up to and including launch day are already public: keep them, unless they break the theme rule
-# (e.g. Namibia -> Toronto), in which case they are re-rolled.
-KEEP = PAST_DAYS + 1
+# Puzzles up to and including today are already public (today's may already be mid-play): keep them, unless
+# they break the theme rule (e.g. Namibia -> Toronto) or the graph has drifted under them, in which case they
+# are re-rolled. KEEP only grows release over release - re-running this the day after launch must not regenerate
+# a puzzle a player could already be looking at.
+today_num = (dt.date.today() - EPOCH_OUT).days + 1
+KEEP = max(PAST_DAYS + 1, today_num)
 published = os.path.join(WEB, "puzzles.json")
 old = json.load(open(published)) if os.path.exists(published) else None
 if old and old.get("epoch") != EPOCH_OUT.isoformat():
