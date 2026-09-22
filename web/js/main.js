@@ -6,7 +6,7 @@ import { drawConstellation } from './map.js';
 import { shareText, shareOrCopy, copyText } from './share.js';
 import { sound, haptic } from './sound.js';
 import { settings as settingsStore, saves, stats as statsStore, endless as endlessStore, TIERS, tierIndex } from './store.js';
-import { EndlessRun, minForRound, BUDGET_MULT } from './endless.js';
+import { EndlessRun, minForRound } from './endless.js';
 import { hydrateIcons } from './icons.js';
 import { submitDailyResult, fetchDailyStats, percentileBetterThan } from './firebase.js';
 
@@ -138,7 +138,7 @@ function paintMission() {
   $('to-sub').textContent = p.targetLabel || '';
   $('min-line').innerHTML =
     state.mode === 'endless'
-      ? `of <b id="min-count">${state.run.budget}</b><span class="sep">·</span>min ${p.min}`
+      ? `of <b id="min-count">${state.run.budget}</b>${state.run.carry > 0 ? `<span class="carry-note">+${state.run.carry} carried</span>` : ''}<span class="sep">·</span>min ${p.min}`
       : `min <b id="min-count">${p.min}</b>`;
   $('gateways').hidden = !g.gatewaysShown;
   if (g.gatewaysShown) fillGateways();
@@ -486,13 +486,24 @@ function roundWon() {
   }, 250);
   setTimeout(() => {
     if (state.run !== run || state.mode !== 'endless' || run.over) return;
+    const leftover = run.left; // moves unspent this round; about to carry into the next one
     run.advance();
     state.game = run.game;
-      persist();
+    persist();
     paintMode();
     paintMission();
     render({ animate: true });
+    if (leftover > 0) showCarryPop(leftover);
   }, 1150);
+}
+
+/** Flashes a "+N carried" chip over the moves badge when unspent moves roll into the new round. */
+function showCarryPop(n) {
+  const el = $('carry-pop');
+  el.textContent = `+${n} carried`;
+  el.classList.remove('show');
+  void el.offsetWidth;
+  el.classList.add('show');
 }
 
 function runOver() {

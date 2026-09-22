@@ -226,6 +226,31 @@ main { flex: 1; display: flex; flex-direction: column; gap: 10px; min-height: 0;
 .min { font-size: 11px; color: var(--muted); letter-spacing: 0.04em; }
 .min b { color: var(--ink); font-weight: 700; }
 
+/* the "+N carried" flourish that plays over the moves badge when a new endless round inherits leftover moves */
+.carry-pop {
+  position: absolute;
+  top: -4px;
+  left: 50%;
+  z-index: 5;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: rgba(var(--cur-rgb), 0.16);
+  border: 1px solid rgba(var(--cur-rgb), 0.5);
+  color: var(--cur);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+}
+.carry-pop.show { animation: carryPop 1.7s var(--ease) forwards; }
+@keyframes carryPop {
+  0% { opacity: 0; transform: translate(-50%, 10px) scale(0.85); }
+  18% { opacity: 1; transform: translate(-50%, -14px) scale(1.08); }
+  32% { opacity: 1; transform: translate(-50%, -14px) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -46px) scale(0.92); }
+}
+
 .gateways {
   display: flex;
   flex-wrap: wrap;
@@ -784,6 +809,7 @@ dialog .row > * { flex: 1; }
 @keyframes lowPulse { 50% { transform: scale(1.07); } }
 .hops.low.bump { animation: bump 0.35s var(--ease), lowPulse 1s 0.35s ease-in-out infinite; }
 .min .sep { color: var(--faint); padding: 0 2px; }
+.carry-note { color: var(--cur); font-weight: 700; margin-left: 3px; }
 
 .inf { color: var(--cur); }
 .endless-cta { width: 100%; margin-top: 14px; border-color: rgba(var(--cur-rgb), 0.45); }

@@ -1,12 +1,19 @@
 // Endless mode: chain links until you run out of moves.
 //
-// Each round hands you a start word and a random target. You get BUDGET_MULT x min moves to reach it.
-// Reach it and the target becomes your next start word with a fresh target; run out and the run is over.
-// Min climbs as the chain grows, so early links are a warm-up and later ones are proper puzzles.
+// Each round hands you a start word and a random target. Reach it and the target becomes your next start
+// word with a fresh target; run out and the run is over. Min climbs as the chain grows, so early links are
+// a warm-up and later ones are proper puzzles.
+//
+// The move budget is a separate curve from min: it starts at BASE_BUDGET and drops by BUDGET_STEP each round
+// (never below the round's min plus a small buffer, so a round is always theoretically closeable), but any
+// moves left unspent when you reach a target carry into the next round's budget on top of that shrinking
+// base. So the squeeze tightens round over round, and playing efficiently is what buys room to survive it.
 
 import { Game } from './game.js';
 
-export const BUDGET_MULT = 5;
+export const BASE_BUDGET = 20;
+export const BUDGET_STEP = 2;
+export const FLOOR_BUFFER = 2;
 
 // How often each theme is drawn. Places are plentiful in the word pool but shouldn't dominate a run.
 /** Targets that a simple semantic navigator reaches less often than this are skipped (when alternatives exist). */
@@ -28,6 +35,7 @@ export class EndlessRun {
     this.round = 1;
     this.links = 0; // rounds completed
     this.totalHops = 0; // moves spent on completed rounds (hint penalties included)
+    this.carry = 0; // moves carried in from the previous round's leftover
     this.chain = []; // start word, then every target reached
     this.used = new Set(); // words already used as a start or target this run
     this.over = false;
@@ -44,8 +52,12 @@ export class EndlessRun {
   get min() {
     return this.game.puzzle.min;
   }
+  /** This round's budget before carryover: shrinks by BUDGET_STEP each round, floored so a clean run is always possible. */
+  get baseBudget() {
+    return Math.max(BASE_BUDGET - BUDGET_STEP * (this.round - 1), this.min + FLOOR_BUFFER);
+  }
   get budget() {
-    return BUDGET_MULT * this.min;
+    return this.baseBudget + this.carry;
   }
   /** Moves remaining this round (hints spend moves too). */
   get left() {
@@ -74,10 +86,12 @@ export class EndlessRun {
     return { rec };
   }
 
-  /** After a round is won: the target becomes the new start and a new target is rolled. */
+  /** After a round is won: the target becomes the new start, a new target is rolled, and unspent moves carry over. */
   advance() {
     if (this.over || this.game.status !== 'won') return false;
+    const leftover = this.left; // moves unspent when the round was won
     this.round += 1;
+    this.carry = leftover;
     this._begin(this.game.puzzle.target);
     return true;
   }
@@ -155,7 +169,7 @@ export class EndlessRun {
     const w = this.world.words;
     const p = this.game.puzzle;
     return {
-      v: 2, round: this.round, links: this.links, totalHops: this.totalHops,
+      v: 2, round: this.round, links: this.links, totalHops: this.totalHops, carry: this.carry,
       chain: this.chain.map((i) => w[i]), used: [...this.used].map((i) => w[i]),
       over: this.over, reason: this.reason,
       puzzle: { start: w[p.start], target: w[p.target], min: p.min },
@@ -176,6 +190,7 @@ export class EndlessRun {
     this.round = s.round;
     this.links = s.links | 0;
     this.totalHops = s.totalHops | 0;
+    this.carry = s.carry | 0;
     this.chain = chain;
     this.used = new Set(used);
     this.over = !!s.over;

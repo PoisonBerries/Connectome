@@ -32,10 +32,13 @@ then push to `main`. All asset paths are relative, so it works under `https://<u
 | Saves & stats | `web/js/store.js` | localStorage only, no accounts, no backend |
 | Community stats | `web/js/firebase.js`, `firestore.rules` | optional; see [Community stats](#community-stats-optional) below |
 
-**Endless mode (∞):** a random start and target, with 5× min moves to connect them. Reach the target and it becomes your
-next start word with a fresh target and a fresh move budget; run out of moves and the run ends. Min ramps 4 → 8 over the
-first ten links, hints spend moves, and your score is links chained. The free step back and each hint are single-use
-per round rather than per puzzle, resetting whenever you reach a target and a new round begins. Rules live in
+**Endless mode (∞):** a random start and target. Each round's move budget starts at 20, then shrinks by 2 every round
+(never below the round's min plus a small buffer, so a clean run is always theoretically possible) — but any moves
+left over when you reach the target carry straight into the next round's budget on top of that, shown with a
+"+N carried" flourish over the moves counter. Reach the target and it becomes your next start word with a fresh
+target; run out of moves and the run ends. Min ramps 4 → 8 over the first ten links (a separate curve from the
+budget), hints spend moves, and your score is links chained. The free step back and each hint are single-use per
+round rather than per puzzle, resetting whenever you reach a target and a new round begins. Rules live in
 `web/js/endless.js`; targets are drawn from the `e` (endpoint pool) list in `graph.json`.
 
 **Scoring (daily):** hops = every forward move (dead ends count). Hints add to that, cheapest first: *Plasticity* +1

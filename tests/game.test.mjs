@@ -102,7 +102,7 @@ console.log('all game logic checks passed');
 
 // ---- endless mode
 {
-  const { EndlessRun, minForRound, BUDGET_MULT } = await import('../web/js/endless.js');
+  const { EndlessRun, minForRound, BASE_BUDGET, BUDGET_STEP, FLOOR_BUFFER } = await import('../web/js/endless.js');
   assert.deepEqual([1, 2, 3, 4, 5, 6, 9, 10, 20].map(minForRound), [4, 4, 5, 5, 6, 6, 8, 8, 8]);
 
   // deterministic RNG so the test is reproducible
@@ -110,21 +110,42 @@ console.log('all game logic checks passed');
   const rand = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
   const run = new EndlessRun(w, { rand });
   let prevTarget = null;
+  let carryExpected = 0; // playing every round optimally, so leftover = budget - min each time
+  let sawCarry = false;
   for (let r = 1; r <= 12; r++) {
     const pz = run.game.puzzle;
     if (prevTarget !== null) assert.equal(pz.start, prevTarget, 'target becomes next start');
     assert(pz.min >= 3 && pz.min <= 9, 'min in range');
     assert.notEqual(w.themeOf(pz.start), w.themeOf(pz.target), `round ${r}: start and target share a theme`);
-    assert.equal(run.budget, BUDGET_MULT * pz.min);
+    const baseExpected = Math.max(BASE_BUDGET - BUDGET_STEP * (r - 1), pz.min + FLOOR_BUFFER);
+    assert.equal(run.baseBudget, baseExpected, `round ${r}: base budget shrinks by ${BUDGET_STEP}/round, floored at min+${FLOOR_BUFFER}`);
+    assert.equal(run.carry, carryExpected, `round ${r}: carry matches previous round's leftover`);
+    assert.equal(run.budget, baseExpected + carryExpected, `round ${r}: budget is base + carry`);
     assert.equal(run.left, run.budget);
     const route = w.shortestPath(pz.start, pz.target);
     let res;
     for (const step of route.slice(1)) res = run.hop(step);
     assert(res.won && !run.over, `round ${r} should be won`);
+    carryExpected = baseExpected + carryExpected - pz.min; // unspent moves roll into the next round
+    if (carryExpected > 0) sawCarry = true;
     prevTarget = pz.target;
     assert(run.advance());
   }
   assert.equal(run.links, 12);
+  assert(sawCarry, 'at least one round should have left unspent moves to carry over');
+
+  // a round finished with moves to spare hands them straight to the next round's budget
+  {
+    const c = new EndlessRun(w, { rand });
+    assert.equal(c.carry, 0, 'round 1 starts with no carry');
+    const route = w.shortestPath(c.game.puzzle.start, c.game.puzzle.target);
+    for (const step of route.slice(1)) c.hop(step);
+    const leftover = c.left;
+    assert(leftover > 0, 'an optimal solve leaves moves unspent');
+    assert(c.advance());
+    assert.equal(c.carry, leftover, 'the exact leftover carries into round 2');
+    assert.equal(c.budget, c.baseBudget + leftover, "round 2's budget includes the carryover");
+  }
 
   // variety: over many rolls, no same-theme pairs and places don't dominate
   const counts = {};
