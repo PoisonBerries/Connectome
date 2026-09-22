@@ -1,8 +1,8 @@
 // Game state machine. No DOM in here, so it can be reasoned about (and tested) on its own.
 
-export const GATEWAY_COST = 1;
-export const COMPASS_COST = 2;
-export const PLASTICITY_COST = 2;
+export const PLASTICITY_COST = 1;
+export const GATEWAY_COST = 2;
+export const COMPASS_COST = 3;
 
 export class Game {
   constructor(world, puzzle, saved = null) {

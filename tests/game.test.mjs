@@ -57,7 +57,7 @@ const first = g2.options[0];
 g2.hop(first); g2.undo();
 assert.equal(g2.moves, 1); assert.equal(g2.path.length, 1);
 g2.compass(); g2.showGateways();
-assert.equal(g2.score, 1 + 2 + 1);
+assert.equal(g2.score, 1 + 3 + 2); // compass=3, gateway=2
 assert(g2.hop(w.neighbors(g2.current).find((n) => !g2.visited.has(n))));
 
 // save / restore round trip
@@ -80,19 +80,19 @@ assert.equal(tierIndex(8, 5), 1); assert.equal(tierIndex(12, 8), 1); assert.equa
   assert(gc.compass(), 'first use works');
   assert(!gc.compass(), 'second use on the same word is refused');
   assert.equal(gc.compassUses, 1);
-  assert.equal(gc.penalty, 2, 'charged once');
+  assert.equal(gc.penalty, 3, 'charged once');
   assert(gc.compassOptions().length >= 1);
   gc.hop(gc.options[0]);
   assert(!gc.hasCompass(), 'a new word has no compass yet');
   assert(gc.compass(), 'a different word can use it');
-  assert.equal(gc.penalty, 4);
+  assert.equal(gc.penalty, 6);
   gc.undo();
   assert.equal(gc.current, startWord);
   assert(gc.hasCompass(), 'coming back to a paid-for word keeps its compass');
   assert(!gc.compass());
-  assert.equal(gc.penalty, 4, 'no extra charge for revisiting');
+  assert.equal(gc.penalty, 6, 'no extra charge for revisiting');
   const back = new Game(w, w.puzzleFor(2), JSON.parse(JSON.stringify(gc.serialize())));
-  assert(back.hasCompass(startWord) && back.penalty === 4, 'compass words survive save/restore');
+  assert(back.hasCompass(startWord) && back.penalty === 6, 'compass words survive save/restore');
 }
 
 console.log('date of #1:', dateOfPuzzle(w, 1).toDateString(), '| today is #', todayNumber(w));
@@ -165,11 +165,11 @@ console.log('all game logic checks passed');
 
   // hints spend moves and can't take the last one
   const h = new EndlessRun(w, { rand });
-  assert(h.canAfford(2));
+  assert(h.canAfford(3));
   assert(h.game.compass(), 'first compass works');
   assert(!h.game.compass(), 'a second compass on the same word does nothing');
   const spent = h.left;
-  assert.equal(spent, h.budget - 2, 'and costs nothing extra');
+  assert.equal(spent, h.budget - 3, 'and costs nothing extra');
   assert(!h.canAfford(spent), 'a hint may not consume the final move');
 
   // save / restore, including mid-celebration
@@ -232,7 +232,7 @@ console.log('all game logic checks passed');
     assert(gc.plasticity(), 'first use works');
     assert.equal(gc.options.length, 5 + extrasBefore.length, 'extra arms become options');
     assert(!gc.plasticity(), 'a second use on the same word does nothing');
-    assert.equal(gc.penalty, 2, 'charged once');
+    assert.equal(gc.penalty, 1, 'charged once');
     assert.deepEqual(new Set(gc.extraOptions), new Set(extrasBefore));
     assert(gc.discovered().size >= gc.visited.size + extrasBefore.length);
 
@@ -246,7 +246,7 @@ console.log('all game logic checks passed');
     assert.equal(gc.current, startWord);
     assert(gc.hasPlasticity(), 'coming back keeps the arms out');
     assert.equal(gc.options.length, 5 + extrasBefore.length, 'still 8 options, for free');
-    assert.equal(gc.penalty, 2, 'no extra charge for revisiting');
+    assert.equal(gc.penalty, 1, 'no extra charge for revisiting');
 
     const back = new Game(w, w.puzzleFor(3), JSON.parse(JSON.stringify(gc.serialize())));
     assert(back.hasPlasticity(startWord) && back.options.length === 5 + extrasBefore.length, 'arms survive save/restore');
