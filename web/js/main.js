@@ -493,7 +493,10 @@ function roundWon() {
     paintMode();
     paintMission();
     render({ animate: true });
-    if (leftover > 0) showCarryPop(leftover);
+    if (leftover > 0) {
+      showCarryPop(leftover);
+      animateCountUp($('hop-count'), run.baseBudget, run.left, run);
+    }
   }, 1150);
 }
 
@@ -504,6 +507,26 @@ function showCarryPop(n) {
   el.classList.remove('show');
   void el.offsetWidth;
   el.classList.add('show');
+}
+
+/** Counts the moves badge up from the shrunk base to the full carried-over total, so the carryover reads as arriving, not just appearing. */
+function animateCountUp(el, from, to, run, duration = 800) {
+  const start = performance.now();
+  el.textContent = from;
+  function step(now) {
+    if (state.run !== run || run.left !== to) return; // a hop or a new run took over; leave the real value alone
+    const t = Math.min(1, (now - start) / duration);
+    el.textContent = Math.round(from + (to - from) * (1 - Math.pow(1 - t, 3)));
+    if (t < 1) {
+      requestAnimationFrame(step);
+    } else {
+      const box = el.parentElement;
+      box.classList.remove('bump');
+      void box.offsetWidth;
+      box.classList.add('bump');
+    }
+  }
+  requestAnimationFrame(step);
 }
 
 function runOver() {
