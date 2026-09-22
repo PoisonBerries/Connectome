@@ -54,7 +54,7 @@ try {
   // ---- puzzleStats: requires a matching play doc first, then only exactly-one-play-sized deltas
   ok('cannot touch puzzleStats without a matching play doc', await fails(setDoc(doc(bob.firestore(), stats(50)), { attempts: increment(1) }, { merge: true })));
 
-  await createPlay(alice, 'alice', 10, { won: false }); // a loss: no count/sumScore/hist/paths in the update at all
+  await createPlay(alice, 'alice', 10, { won: false }); // a loss: no count/sumScore/hist/firstWord/lastWord in the update at all
   ok('first-ever finish on a puzzle (a loss) can create the aggregate', await succeeds(
     setDoc(doc(alice.firestore(), stats(10)), { attempts: increment(1) }, { merge: true })
   ));
@@ -67,20 +67,28 @@ try {
   // where that's actually correct (creating the very first entry in a map that doesn't exist yet, nothing to
   // preserve). Using the wrong one of the two for an update is exactly the bug this whole aggregate design had
   // until it was caught by testing against the real project: see the "malformed update" checks further down.
+  const win7 = { attempts: increment(1), count: increment(1), sumScore: increment(7), 'hist.7': increment(1), 'firstWord.gods': increment(1), 'lastWord.feast': increment(1) };
   await createPlay(bob, 'bob', 10, { won: true, score: 7 });
   ok('a second, different user can add a win on top of a loss-only aggregate', await succeeds(
-    updateDoc(doc(bob.firestore(), stats(10)), { attempts: increment(1), count: increment(1), sumScore: increment(7), 'hist.7': increment(1), 'paths.Loki%7Cgods%7CRamadan': increment(1) })
+    updateDoc(doc(bob.firestore(), stats(10)), win7)
   ));
   snap = await getDoc(doc(bob.firestore(), stats(10)));
-  ok('aggregate now reflects both finishes, with a real nested hist map', snap.data().attempts === 2 && snap.data().count === 1 && snap.data().sumScore === 7 && snap.data().hist?.['7'] === 1);
+  ok('aggregate now reflects both finishes, with real nested maps', snap.data().attempts === 2 && snap.data().count === 1 && snap.data().sumScore === 7
+    && snap.data().hist?.['7'] === 1 && snap.data().firstWord?.gods === 1 && snap.data().lastWord?.feast === 1);
 
   ok('cannot jump attempts by more than 1 in a single write', await fails(
     updateDoc(doc(bob.firestore(), stats(10)), { attempts: increment(5) })
   ));
   ok('cannot touch two histogram buckets in one write', await fails(
-    updateDoc(doc(bob.firestore(), stats(10)), { attempts: increment(1), count: increment(1), sumScore: increment(5), 'hist.5': increment(1), 'hist.6': increment(1), 'paths.x': increment(1) })
+    updateDoc(doc(bob.firestore(), stats(10)), { attempts: increment(1), count: increment(1), sumScore: increment(5), 'hist.5': increment(1), 'hist.6': increment(1), 'firstWord.x': increment(1), 'lastWord.y': increment(1) })
   ));
-  ok('cannot record a win without also updating sumScore/hist/paths', await fails(
+  ok('cannot touch two first-word buckets in one write', await fails(
+    updateDoc(doc(bob.firestore(), stats(10)), { attempts: increment(1), count: increment(1), sumScore: increment(5), 'hist.5': increment(1), 'firstWord.x': increment(1), 'firstWord.z': increment(1), 'lastWord.y': increment(1) })
+  ));
+  ok('cannot record a win while updating firstWord but not lastWord', await fails(
+    updateDoc(doc(bob.firestore(), stats(10)), { attempts: increment(1), count: increment(1), sumScore: increment(5), 'hist.5': increment(1), 'firstWord.x': increment(1) })
+  ));
+  ok('cannot record a win without also updating sumScore/hist/firstWord/lastWord', await fails(
     updateDoc(doc(bob.firestore(), stats(10)), { attempts: increment(1), count: increment(1) })
   ));
   ok('cannot delete an aggregate', await fails(deleteDoc(doc(bob.firestore(), stats(10)))));
@@ -91,7 +99,7 @@ try {
   const carol = env.authenticatedContext('carol');
   await createPlay(carol, 'carol', 10, { won: true, score: 9 });
   ok('a malformed dotted-key write via setDoc+merge against an EXISTING doc is rejected, not silently wrong', await fails(
-    setDoc(doc(carol.firestore(), stats(10)), { attempts: increment(1), count: increment(1), sumScore: increment(9), 'hist.9': increment(1), 'paths.x': increment(1) }, { merge: true })
+    setDoc(doc(carol.firestore(), stats(10)), { attempts: increment(1), count: increment(1), sumScore: increment(9), 'hist.9': increment(1), 'firstWord.x': increment(1), 'lastWord.y': increment(1) }, { merge: true })
   ));
 
   // ---- the same bug, but on a brand-new puzzle (a create): a flat "hist.5" field isn't a size-1 hist map, so the
@@ -99,10 +107,15 @@ try {
   const dave = env.authenticatedContext('dave');
   await createPlay(dave, 'dave', 60, { won: true, score: 5 });
   ok('a malformed dotted-key write via setDoc+merge on a FRESH puzzle is also rejected', await fails(
-    setDoc(doc(dave.firestore(), stats(60)), { attempts: increment(1), count: increment(1), sumScore: increment(5), 'hist.5': increment(1), 'paths.x': increment(1) }, { merge: true })
+    setDoc(doc(dave.firestore(), stats(60)), { attempts: increment(1), count: increment(1), sumScore: increment(5), 'hist.5': increment(1), 'firstWord.x': increment(1), 'lastWord.y': increment(1) }, { merge: true })
   ));
   ok('the correctly-shaped create for that same fresh puzzle succeeds', await succeeds(
-    setDoc(doc(dave.firestore(), stats(60)), { attempts: increment(1), count: increment(1), sumScore: increment(5), hist: { 5: increment(1) }, paths: { x: increment(1) } }, { merge: true })
+    setDoc(doc(dave.firestore(), stats(60)), { attempts: increment(1), count: increment(1), sumScore: increment(5), hist: { 5: increment(1) }, firstWord: { x: increment(1) }, lastWord: { y: increment(1) } }, { merge: true })
+  ));
+  const erin = env.authenticatedContext('erin');
+  await createPlay(erin, 'erin', 61, { won: true, score: 5 });
+  ok('a create with mismatched map sizes (firstWord missing its entry) is rejected', await fails(
+    setDoc(doc(erin.firestore(), stats(61)), { attempts: increment(1), count: increment(1), sumScore: increment(5), hist: { 5: increment(1) }, firstWord: {}, lastWord: { y: increment(1) } }, { merge: true })
   ));
 
   // ---- reads

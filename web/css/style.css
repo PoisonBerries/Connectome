@@ -838,3 +838,11 @@ dialog .row > * { flex: 1; }
 .reroll-btn { display: none; }
 body[data-mode='endless'] .reroll-btn { display: inline-grid; }
 .reroll-btn:active { transform: scale(0.92); }
+
+/* ------------------------------------------------------------------ community first/last word */
+.community-words { display: flex; flex-wrap: wrap; gap: 14px 28px; margin-top: 14px; }
+.community-words .cword { display: flex; flex-direction: column; gap: 6px; }
+.community-words .route-label { margin-top: 0; }
+.community-words .cword-val { display: flex; align-items: center; gap: 8px; }
+.community-words .chip { padding: 4px 12px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--border-2); color: var(--ink); font-weight: 700; font-size: 14px; }
+.community-words em { font-style: normal; font-size: 11.5px; color: var(--muted); }

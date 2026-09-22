@@ -1,4 +1,4 @@
-// Optional community stats: "how you did vs. average" and "the most common route", via Firestore + Anonymous Auth.
+// Optional community stats: "how you did vs. average" and "the most common first/last word", via Firestore + Anonymous Auth.
 //
 // Everything in this file is best-effort. The game is fully playable without it — if Firebase is blocked (ad
 // blockers commonly block Google/Firebase domains), the network is down, or the project isn't configured yet, every
@@ -13,7 +13,9 @@
 //     count      wins only — the denominator for "average" and "most common route"
 //     sumScore   sum of scores among wins (avg = sumScore / count)
 //     hist.N     wins with score exactly N, N capped at HIST_CAP (an overflow bucket beyond that)
-//     paths.K    wins whose route encodes to key K = encodeURIComponent(words.join('|'))
+//     firstWord.K  wins whose first hop (the word right after the start) encodes to key K
+//     lastWord.K   wins whose last hop before the target encodes to key K
+//     (K = encodeURIComponent(word); a single word, not a whole path, is small enough to just show plainly)
 
 const SDK = 'https://www.gstatic.com/firebasejs/12.19.0';
 const HIST_CAP = 40;
@@ -72,8 +74,8 @@ function load() {
   return withTimeout(readyPromise);
 }
 
-const pathKey = (words) => encodeURIComponent(words.join('|'));
-const keyToPath = (key) => decodeURIComponent(key).split('|');
+const wordKey = (word) => encodeURIComponent(word);
+const keyToWord = (key) => decodeURIComponent(key);
 
 /**
  * Records one finished daily puzzle. Safe to call every time a puzzle is finished; callers should still only call it
@@ -86,7 +88,10 @@ export async function submitDailyResult(puzzleNum, { score, min, won, path }) {
     const playRef = fsMod.doc(db, 'plays', `${puzzleNum}_${uid}`);
     const statsRef = fsMod.doc(db, 'puzzleStats', String(puzzleNum));
     const bucket = Math.min(score, HIST_CAP);
-    const key = pathKey(path);
+    // path is [start, ...hops, target]; the first hop after the start and the hop right before the target are the
+    // same word when a win takes exactly one hop (start -> target directly) -- that's an accurate, not broken, result.
+    const firstKey = wordKey(path[1]);
+    const lastKey = wordKey(path[path.length - 2]);
 
     await withTimeout(
       fsMod.setDoc(playRef, { puzzle: puzzleNum, uid, score, par: min, won, path, ts: fsMod.serverTimestamp() })
@@ -95,13 +100,14 @@ export async function submitDailyResult(puzzleNum, { score, min, won, path }) {
     // updateDoc() parses a dotted string key ("hist.5") as a real nested-field path, merging into just that one key
     // without disturbing any other bucket already there. setDoc(...,{merge:true}) does NOT do this for a plain
     // string key — it would store a literal field literally named "hist.5" — so it's only safe to use as the
-    // create-time fallback below, where hist/paths don't exist yet and there's nothing to accidentally clobber.
+    // create-time fallback below, where hist/firstWord/lastWord don't exist yet and there's nothing to accidentally clobber.
     const dotted = { attempts: fsMod.increment(1) };
     if (won) {
       dotted.count = fsMod.increment(1);
       dotted.sumScore = fsMod.increment(score);
       dotted[`hist.${bucket}`] = fsMod.increment(1);
-      dotted[`paths.${key}`] = fsMod.increment(1);
+      dotted[`firstWord.${firstKey}`] = fsMod.increment(1);
+      dotted[`lastWord.${lastKey}`] = fsMod.increment(1);
     }
     try {
       // updateDoc() requires the doc to already exist; on a fresh puzzle nobody has finished yet, Firestore's rules
@@ -116,7 +122,8 @@ export async function submitDailyResult(puzzleNum, { score, min, won, path }) {
         fresh.count = fsMod.increment(1);
         fresh.sumScore = fsMod.increment(score);
         fresh.hist = { [bucket]: fsMod.increment(1) };
-        fresh.paths = { [key]: fsMod.increment(1) };
+        fresh.firstWord = { [firstKey]: fsMod.increment(1) };
+        fresh.lastWord = { [lastKey]: fsMod.increment(1) };
       }
       await withTimeout(fsMod.setDoc(statsRef, fresh, { merge: true }));
     }
@@ -127,31 +134,38 @@ export async function submitDailyResult(puzzleNum, { score, min, won, path }) {
   }
 }
 
-/** @returns {Promise<null|{attempts:number, solved:number, avg:number|null, hist:object, bestPath:string[]|null, bestPathPct:number}>} */
+/** The single most common key in a {key: count} map, decoded back to a word, plus what share of `count` it is. */
+function topWord(map, count) {
+  let bestKey = null;
+  let bestN = 0;
+  for (const [k, n] of Object.entries(map || {})) {
+    if (n > bestN) {
+      bestN = n;
+      bestKey = k;
+    }
+  }
+  return { word: bestKey ? keyToWord(bestKey) : null, pct: count ? Math.round((100 * bestN) / count) : 0 };
+}
+
+/** @returns {Promise<null|{attempts:number, solved:number, avg:number|null, hist:object, bestFirst:string|null, bestFirstPct:number, bestLast:string|null, bestLastPct:number}>} */
 export async function fetchDailyStats(puzzleNum) {
   try {
     const { fsMod, db } = await load();
     const snap = await withTimeout(fsMod.getDoc(fsMod.doc(db, 'puzzleStats', String(puzzleNum))));
-    if (!snap.exists()) return { attempts: 0, solved: 0, avg: null, hist: {}, bestPath: null, bestPathPct: 0 };
+    if (!snap.exists()) return { attempts: 0, solved: 0, avg: null, hist: {}, bestFirst: null, bestFirstPct: 0, bestLast: null, bestLastPct: 0 };
     const d = snap.data();
-    const hist = d.hist || {};
-    const paths = d.paths || {};
     const count = d.count || 0;
-    let bestKey = null;
-    let bestN = 0;
-    for (const [k, n] of Object.entries(paths)) {
-      if (n > bestN) {
-        bestN = n;
-        bestKey = k;
-      }
-    }
+    const first = topWord(d.firstWord, count);
+    const last = topWord(d.lastWord, count);
     return {
       attempts: d.attempts || 0,
       solved: count,
       avg: count ? (d.sumScore || 0) / count : null,
-      hist,
-      bestPath: bestKey ? keyToPath(bestKey) : null,
-      bestPathPct: count ? Math.round((100 * bestN) / count) : 0,
+      hist: d.hist || {},
+      bestFirst: first.word,
+      bestFirstPct: first.pct,
+      bestLast: last.word,
+      bestLastPct: last.pct,
     };
   } catch (e) {
     console.warn('[connectome] could not load community stats:', e && e.message);

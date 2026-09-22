@@ -49,8 +49,9 @@ show the same thing. Rating tiers run from *Perfect wiring* (min) down to *Tangl
 
 **Community stats:** once you finish a daily puzzle, the result screen shows how you compare — solve count, the
 average number of hops, the percentage of solvers you beat (wins only; a give-up doesn't get a percentile), and the
-most common route. This is entirely optional: the game works exactly the same without it, just without that section.
-See [Community stats (optional)](#community-stats-optional) to turn it on.
+most common first hop and the most common word right before the target (shown plainly, not behind a click — a single
+word each isn't much of a spoiler). This is entirely optional: the game works exactly the same without it, just
+without that section. See [Community stats (optional)](#community-stats-optional) to turn it on.
 
 ## Community stats (optional)
 

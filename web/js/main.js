@@ -388,7 +388,7 @@ function finish({ show = true } = {}) {
 /** Community numbers for the puzzle just finished: how you compare, and the route most solvers took. */
 async function loadCommunity(num, myScore, won) {
   $('community').hidden = true;
-  $('community-route').hidden = true;
+  $('community-words').innerHTML = '';
   let data = state.communityCache.get(num);
   if (data === undefined) {
     data = await fetchDailyStats(num);
@@ -405,11 +405,13 @@ async function loadCommunity(num, myScore, won) {
     ...(pct == null ? [] : [['You beat', `${pct}%`]]),
   ].map(([l, v]) => `<div class="stat"><b>${v}</b><small>${l}</small></div>`).join('');
 
-  if (data.bestPath && data.bestPath.length > 1) {
-    $('community-route').hidden = false;
-    $('community-route').querySelector('summary').textContent = `Most common route · ${data.bestPathPct}% of solvers`;
-    $('community-route-body').innerHTML = `<div class="path-words">${data.bestPath.map((w) => esc(w)).join(' <i>→</i> ')}</div>`;
-  }
+  $('community-words').innerHTML = [
+    ['Most started with', data.bestFirst, data.bestFirstPct],
+    ['Most arrived via', data.bestLast, data.bestLastPct],
+  ]
+    .filter(([, word]) => word)
+    .map(([label, word, p]) => `<div class="cword"><span class="route-label">${label}</span><span class="cword-val"><span class="chip">${esc(word)}</span><em>${p}%</em></span></div>`)
+    .join('');
   $('community').hidden = false;
 }
 
