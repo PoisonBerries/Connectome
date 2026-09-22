@@ -30,6 +30,7 @@ then push to `main`. All asset paths are relative, so it works under `https://<u
 | Game logic | `web/js/game.js`, `data.js` | Pure state machine + BFS (par, hints); unit-checked in `tests/` |
 | Look & feel | `web/js/stage.js`, `map.js`, `css/` | DOM buttons on an SVG synapse layer; canvas constellation of your explored network |
 | Saves & stats | `web/js/store.js` | localStorage only, no accounts, no backend |
+| Community stats | `web/js/firebase.js`, `firestore.rules` | optional; see [Community stats](#community-stats-optional) below |
 
 **Endless mode (∞):** a random start and target, with 5× par moves to connect them. Reach the target and it becomes your
 next start word with a fresh target and a fresh move budget; run out of moves and the run ends. Par ramps 4 → 8 over the
@@ -45,6 +46,50 @@ show the same thing. Rating tiers run from *Perfect wiring* (par) down to *Tangl
 
 **Difficulty curve:** par is 5 on Monday/Tuesday, 6 on Wed/Thu, 7 on Fri/Sat, 8 on Sunday. A simple simulated
 "semantic hill-climbing" player needs a median of ~15-28 clicks on these, matching typical human play.
+
+**Community stats:** once you finish a daily puzzle, the result screen shows how you compare — solve count, the
+average number of hops, the percentage of solvers you beat (wins only; a give-up doesn't get a percentile), and the
+most common route. This is entirely optional: the game works exactly the same without it, just without that section.
+See [Community stats (optional)](#community-stats-optional) to turn it on.
+
+## Community stats (optional)
+
+This is a small Firestore backend (Firebase's free Spark plan covers it) that every player writes one anonymous,
+immutable record to per daily puzzle, and a per-puzzle aggregate they nudge by exactly one play's worth on each
+finish. No accounts, no names, no emails — the only identity involved is a random ID from Firebase Anonymous Auth,
+and it isn't stored on the aggregate at all. `web/js/firebase.js` has the full data model and client code;
+`firestore.rules` is what actually enforces all of this server-side (both files are commented throughout).
+
+**Setup** (one-time, in the [Firebase console](https://console.firebase.google.com/)):
+
+1. **Authentication → Sign-in method → Anonymous → Enable.** This is the only auth method the game uses; there's no
+   sign-up flow, it happens silently the first time someone finishes a puzzle.
+2. **Firestore Database → Create database → Production mode**, any region (the rules below are the actual access
+   control, "production mode" here just means "start from deny-all" — the region only affects latency).
+3. **Firestore Database → Rules → paste in the contents of `firestore.rules`** from this repo → Publish.
+   (If you have the [Firebase CLI](https://firebase.google.com/docs/cli) set up and linked to this project instead,
+   `firebase deploy --only firestore:rules` does the same thing from the command line.)
+4. **Project settings (gear icon) → General → Your apps → add a Web app** (or open the existing one) → copy the
+   `firebaseConfig` object it shows you.
+5. Paste the `apiKey` and `appId` from that object into `web/js/firebase.js` (`projectId`/`authDomain` are already
+   filled in for `connectome-53d32`; change them too if you're pointing this at a different Firebase project).
+6. Commit and push. That's it — no server to run, no environment variables, nothing to deploy beyond the rules.
+
+**Threat model, stated plainly:** there's no backend verifying a puzzle was actually solved (that needs a Cloud
+Function, which needs the paid Blaze plan — still free up to a large quota, just requires a card on file). The rules
+stop the cheap kind of tampering: writing arbitrary numbers into the aggregate, resubmitting the same puzzle to pad
+it, or forging someone else's ID. They can't stop someone from opening devtools, creating a fresh anonymous identity,
+and submitting one fabricated-but-plausible play. That's an accepted limitation of a free, backend-less setup — if it
+ever becomes a real problem, the fix is moving the aggregate update into a Cloud Function that checks the path against
+the actual graph before trusting it.
+
+**Testing the rules:** `tests/firestore.rules.test.mjs` exercises `firestore.rules` against a local emulator (not
+your real project — no credentials touched). It needs Java (the emulator is a JVM process):
+
+```sh
+npm install
+npm run test:rules
+```
 
 ## Regenerating the data (`pipeline/`)
 

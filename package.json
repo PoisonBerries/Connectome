@@ -1,0 +1,14 @@
+{
+  "name": "connectome",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node tests/game.test.mjs",
+    "test:rules": "firebase emulators:exec --only firestore,auth --project demo-connectome \"node tests/firestore.rules.test.mjs\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
+    "firebase": "^12.19.0",
+    "firebase-tools": "^13.29.1"
+  }
+}

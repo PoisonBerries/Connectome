@@ -1,0 +1,85 @@
+// Security rules for the community-stats backend (see web/js/firebase.js for the client side, README.md for the
+// threat-model notes). Everyone who loads the game signs in anonymously first, so `request.auth` is always set for
+// a real player; there is no other account system and nothing here ever stores a name, email or IP.
+//
+// Threat model, stated plainly: there is no server verifying a puzzle was actually solved (that would need a Cloud
+// Function, which needs the paid Blaze plan). These rules stop the cheap version of tampering — writing arbitrary
+// numbers into the aggregate, resubmitting the same puzzle to pad it, or forging someone else's uid — but a
+// determined person with devtools open could still fabricate one plausible-looking play per anonymous identity they
+// create. That's an accepted limitation of a free, backend-less setup, not an oversight.
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    // Map field access that treats a missing key as its zero value instead of throwing, since a doc's first-ever
+    // write may not touch every field yet (a puzzle whose first finisher lost has no `hist`/`paths` at all).
+    function num(d, key) {
+      return d.get(key, 0);
+    }
+    function mapf(d, key) {
+      return d.get(key, {});
+    }
+
+    function isValidStats(d) {
+      return num(d, 'attempts') is int && num(d, 'attempts') >= 0
+        && num(d, 'count') is int && num(d, 'count') >= 0 && num(d, 'count') <= num(d, 'attempts')
+        && num(d, 'sumScore') is int && num(d, 'sumScore') >= 0
+        && mapf(d, 'hist') is map
+        && mapf(d, 'paths') is map;
+    }
+
+    // A single finish may move the aggregate by exactly the amount one real play contributes: always +1 attempt;
+    // only on a win, +1 to count, the winning score added to sumScore, +1 to exactly one histogram bucket, and +1
+    // to exactly one route bucket. Anything else (bulk increments, touching two buckets, negative deltas) is refused.
+    function isPlausibleDelta(before, after) {
+      let attemptsDelta = num(after, 'attempts') - num(before, 'attempts');
+      let countDelta = num(after, 'count') - num(before, 'count');
+      let scoreDelta = num(after, 'sumScore') - num(before, 'sumScore');
+      return attemptsDelta == 1
+        && countDelta >= 0 && countDelta <= 1
+        && (countDelta == 0
+              ? scoreDelta == 0 && mapf(after, 'hist') == mapf(before, 'hist') && mapf(after, 'paths') == mapf(before, 'paths')
+              : scoreDelta >= 1 && scoreDelta <= 500
+                && mapf(after, 'hist').diff(mapf(before, 'hist')).affectedKeys().size() == 1
+                && mapf(after, 'paths').diff(mapf(before, 'paths')).affectedKeys().size() == 1);
+    }
+
+    // A puzzleStats write is only accepted from a uid that has already created its own (create-once, never reused)
+    // plays record for that puzzle, tying the two collections together without needing a shared transaction.
+    function hasPlayRecord(puzzleId) {
+      return exists(/databases/$(database)/documents/plays/$(puzzleId + '_' + request.auth.uid));
+    }
+
+    // One immutable record per player per daily puzzle. The client never reads these back — the aggregate below
+    // covers the UI — they exist so `hasPlayRecord` has something concrete to check, and so the raw data could be
+    // recomputed or audited later if that's ever needed.
+    match /plays/{playId} {
+      allow read: if false;
+      allow update, delete: if false;
+      allow create: if isSignedIn()
+        && request.resource.data.uid == request.auth.uid
+        && playId == (string(request.resource.data.puzzle) + '_' + request.auth.uid)
+        && request.resource.data.puzzle is int && request.resource.data.puzzle > 0 && request.resource.data.puzzle < 100000
+        && request.resource.data.score is int && request.resource.data.score >= 0 && request.resource.data.score <= 500
+        && request.resource.data.par is int && request.resource.data.par >= 1 && request.resource.data.par <= 20
+        && request.resource.data.won is bool
+        && request.resource.data.path is list && request.resource.data.path.size() <= 120
+        && request.resource.data.ts == request.time;
+    }
+
+    // Public, anonymised aggregate per puzzle: totals, a score histogram, a route-frequency map. No PII — the only
+    // identity anywhere in this project is a random anonymous-auth uid, which isn't stored on this document at all.
+    match /puzzleStats/{puzzleId} {
+      allow read: if isSignedIn();
+      allow delete: if false;
+      allow create: if isSignedIn() && hasPlayRecord(puzzleId) && isValidStats(request.resource.data)
+        && num(request.resource.data, 'attempts') <= 1 && num(request.resource.data, 'count') <= 1;
+      allow update: if isSignedIn() && hasPlayRecord(puzzleId) && isValidStats(request.resource.data)
+        && isPlausibleDelta(resource.data, request.resource.data);
+    }
+  }
+}

@@ -8,6 +8,7 @@ import { sound, haptic } from './sound.js';
 import { settings as settingsStore, saves, stats as statsStore, endless as endlessStore, TIERS, tierIndex } from './store.js';
 import { EndlessRun, parForRound, BUDGET_MULT } from './endless.js';
 import { hydrateIcons } from './icons.js';
+import { submitDailyResult, fetchDailyStats, percentileBetterThan } from './firebase.js';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -25,6 +26,7 @@ const state = {
   run: null, // EndlessRun while in endless mode
   dailyNum: 1, // the daily puzzle to return to
   endlessResult: null,
+  communityCache: new Map(), // puzzle number -> community stats (or null), so reopening results doesn't re-fetch
 };
 
 // ------------------------------------------------------------------ boot
@@ -374,9 +376,41 @@ function finish({ show = true } = {}) {
   if (!saves.index()[num]) {
     statsStore.record(num, state.today, won, Math.max(0, tier));
     saves.mark(num, { status: game.status, score: game.score, tier });
+    if (state.mode === 'daily') {
+      // fire-and-forget: submitDailyResult never throws, and community stats must never hold up the result screen
+      submitDailyResult(num, { score: game.score, par: game.puzzle.par, won, path: game.path.map((i) => world.words[i]) });
+    }
   }
   state.lastTier = tier;
   if (show) openResult();
+}
+
+/** Community numbers for the puzzle just finished: how you compare, and the route most solvers took. */
+async function loadCommunity(num, myScore, won) {
+  $('community').hidden = true;
+  $('community-route').hidden = true;
+  let data = state.communityCache.get(num);
+  if (data === undefined) {
+    data = await fetchDailyStats(num);
+    state.communityCache.set(num, data);
+  }
+  // the result dialog may have moved on to a different puzzle while this was in flight
+  if (state.game.puzzle.num !== num || !$('dlg-result').open || !data || !data.solved) return;
+
+  // "you beat X%" only makes sense against a real finish, not a give-up
+  const pct = won ? percentileBetterThan(data.hist, myScore) : null;
+  $('community-row').innerHTML = [
+    ['Solved by', data.solved],
+    ['Avg hops', data.avg.toFixed(1)],
+    ...(pct == null ? [] : [['You beat', `${pct}%`]]),
+  ].map(([l, v]) => `<div class="stat"><b>${v}</b><small>${l}</small></div>`).join('');
+
+  if (data.bestPath && data.bestPath.length > 1) {
+    $('community-route').hidden = false;
+    $('community-route').querySelector('summary').textContent = `Most common route · ${data.bestPathPct}% of solvers`;
+    $('community-route-body').innerHTML = `<div class="path-words">${data.bestPath.map((w) => esc(w)).join(' <i>→</i> ')}</div>`;
+  }
+  $('community').hidden = false;
 }
 
 // ------------------------------------------------------------------ endless mode
@@ -574,6 +608,7 @@ function openResult() {
   state.map?.stop();
   requestAnimationFrame(() => (state.map = drawConstellation($('res-canvas'), world, game, { animate: state.settings.motion })));
   d.scrollTop = 0;
+  loadCommunity(p.num, game.score, game.status === 'won');
 }
 
 function openMap() {
