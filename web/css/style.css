@@ -838,6 +838,8 @@ dialog .row > * { flex: 1; }
 .syn.base.extra { stroke: var(--start); stroke-dasharray: 5 6; }
 .hint-opt#hint-plasticity .hi { color: var(--start); }
 .hint-opt#hint-plasticity em { color: var(--start); }
+.hint-opt#hint-gateways .hi { color: var(--tgt); }
+.hint-opt#hint-gateways em { color: var(--tgt); }
 
 /* ------------------------------------------------------------------ community stats */
 .community { margin-top: 4px; }
