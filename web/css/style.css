@@ -794,3 +794,5 @@ dialog .row > * { flex: 1; }
 .chain .chip.first { color: var(--start); border-color: rgba(var(--start-rgb), 0.4); }
 .chain .chip.miss { color: var(--tgt); border: 1px dashed rgba(var(--tgt-rgb), 0.6); background: rgba(var(--tgt-rgb), 0.06); }
 .chain .arr { color: var(--faint); font-size: 12px; }
+.route-label { margin-top: 10px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.route-label:first-child { margin-top: 4px; }

@@ -449,9 +449,14 @@ function openEndlessOver() {
     location.origin && location.origin !== 'null' ? location.origin + location.pathname : '',
   ].filter(Boolean).join('\n');
   const p = run.game.puzzle;
-  const route = world.shortestPath(p.start, p.target) || [];
-  $('eo-route').querySelector('summary').textContent = `The shortest route (${route.length - 1} hops)`;
-  $('eo-route-body').innerHTML = `<div class="path-words">${route.map((id) => esc(w[id])).join(' <i>→</i> ')}</div>`;
+  const here = run.game.current; // the word you were on when the run ended
+  const fromStart = world.shortestPath(p.start, p.target) || [];
+  const fromHere = here === p.start ? null : world.shortestPath(here, p.target);
+  const line = (route) => `<div class="path-words">${route.map((id) => esc(w[id])).join(' <i>→</i> ')}</div>`;
+  $('eo-route').querySelector('summary').textContent = 'The shortest routes';
+  $('eo-route-body').innerHTML =
+    `<div class="route-label">From the start · ${fromStart.length - 1} hops</div>${line(fromStart)}` +
+    (fromHere ? `<div class="route-label">From where you stopped, ${esc(w[here])} · ${fromHere.length - 1} hops</div>${line(fromHere)}` : '');
   openDialog('dlg-endless-over');
   state.map?.stop();
   requestAnimationFrame(() => (state.map = drawConstellation($('eo-canvas'), world, run.game, { animate: state.settings.motion })));
