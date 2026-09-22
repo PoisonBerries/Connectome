@@ -6,7 +6,7 @@ import { drawConstellation } from './map.js';
 import { shareText, shareOrCopy, copyText } from './share.js';
 import { sound, haptic } from './sound.js';
 import { settings as settingsStore, saves, stats as statsStore, endless as endlessStore, TIERS, tierIndex } from './store.js';
-import { EndlessRun, parForRound, BUDGET_MULT } from './endless.js';
+import { EndlessRun, minForRound, BUDGET_MULT } from './endless.js';
 import { hydrateIcons } from './icons.js';
 import { submitDailyResult, fetchDailyStats, percentileBetterThan } from './firebase.js';
 
@@ -136,10 +136,10 @@ function paintMission() {
   $('to-word').textContent = world.words[p.target];
   $('from-sub').textContent = p.startLabel || '';
   $('to-sub').textContent = p.targetLabel || '';
-  $('par-line').innerHTML =
+  $('min-line').innerHTML =
     state.mode === 'endless'
-      ? `of <b id="par-count">${state.run.budget}</b><span class="sep">·</span>par ${p.par}`
-      : `par <b id="par-count">${p.par}</b>`;
+      ? `of <b id="min-count">${state.run.budget}</b><span class="sep">·</span>min ${p.min}`
+      : `min <b id="min-count">${p.min}</b>`;
   $('gateways').hidden = !g.gatewaysShown;
   if (g.gatewaysShown) fillGateways();
 }
@@ -258,7 +258,7 @@ function pick(id) {
   const rec = res.rec;
   persist();
 
-  const progress = g.puzzle.par ? clamp(1 - g.dist[id] / Math.max(1, g.dist[g.puzzle.start]), 0, 1) : 0;
+  const progress = g.puzzle.min ? clamp(1 - g.dist[id] / Math.max(1, g.dist[g.puzzle.start]), 0, 1) : 0;
   sound.hop(progress, Math.sign(rec.before - rec.after));
   haptic(8);
 
@@ -372,13 +372,13 @@ function finish({ show = true } = {}) {
   const { game, world } = state;
   const num = game.puzzle.num;
   const won = game.status === 'won';
-  const tier = won ? tierIndex(game.score, game.puzzle.par) : -1;
+  const tier = won ? tierIndex(game.score, game.puzzle.min) : -1;
   if (!saves.index()[num]) {
     statsStore.record(num, state.today, won, Math.max(0, tier));
     saves.mark(num, { status: game.status, score: game.score, tier });
     if (state.mode === 'daily') {
       // fire-and-forget: submitDailyResult never throws, and community stats must never hold up the result screen
-      submitDailyResult(num, { score: game.score, par: game.puzzle.par, won, path: game.path.map((i) => world.words[i]) });
+      submitDailyResult(num, { score: game.score, min: game.puzzle.min, won, path: game.path.map((i) => world.words[i]) });
     }
   }
   state.lastTier = tier;
@@ -492,10 +492,10 @@ function openEndlessOver() {
   $('eo-chain').innerHTML =
     run.chain.map((id, i) => `<span class="chip${i === 0 ? ' first' : ''}">${esc(w[id])}</span>`).join('<span class="arr">→</span>') +
     (run.missed != null ? `<span class="arr">→</span><span class="chip miss">${esc(w[run.missed])}</span>` : '');
-  const topPar = run.links ? parForRound(run.links) : 0;
+  const topMin = run.links ? minForRound(run.links) : 0;
   $('eo-share').textContent = [
     `Connectome ∞ 🔗×${run.links}${newBest && run.links ? ' 🏆' : ''}`,
-    run.links ? `Chained ${run.links} ${run.links === 1 ? 'word' : 'words'} · up to par ${topPar} · ${run.totalHops} hops` : 'Broke the chain on the first link',
+    run.links ? `Chained ${run.links} ${run.links === 1 ? 'word' : 'words'} · up to min ${topMin} · ${run.totalHops} hops` : 'Broke the chain on the first link',
     location.origin && location.origin !== 'null' ? location.origin + location.pathname : '',
   ].filter(Boolean).join('\n');
   const p = run.game.puzzle;
@@ -575,19 +575,19 @@ function openStats() {
 function openResult() {
   const { game, world } = state;
   const won = game.status === 'won';
-  const tier = won ? tierIndex(game.score, game.puzzle.par) : -1;
+  const tier = won ? tierIndex(game.score, game.puzzle.min) : -1;
   const T = TIERS[tier];
   const p = game.puzzle;
 
   $('res-emoji').textContent = won ? T.emoji : '🌫️';
   $('res-title').textContent = won ? T.name : 'Signal lost';
   $('res-sub').textContent = won
-    ? `${world.words[p.start]} to ${world.words[p.target]} in ${game.score} hops${game.score === p.par ? ', the shortest possible.' : `. The shortest route is ${p.par}.`}`
+    ? `${world.words[p.start]} to ${world.words[p.target]} in ${game.score} hops${game.score === p.min ? ', the shortest possible.' : `. The shortest route is ${p.min}.`}`
     : `The shortest route from where you stopped was ${game.revealed ? game.revealed.length - 1 : '?'} hops.`;
 
   $('res-stats').innerHTML = [
     ['Hops', game.score, game.penalty ? `${game.moves} + ${game.penalty} hint` : ''],
-    ['Par', p.par, ''],
+    ['Min', p.min, ''],
     ['Words seen', game.discovered().size, ''],
   ].map(([l, v, sub]) => `<div class="stat"><b>${v}</b><small>${l}</small>${sub ? `<em>${sub}</em>` : ''}</div>`).join('');
 

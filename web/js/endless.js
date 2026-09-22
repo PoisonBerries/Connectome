@@ -1,8 +1,8 @@
 // Endless mode: chain links until you run out of moves.
 //
-// Each round hands you a start word and a random target. You get BUDGET_MULT x par moves to reach it.
+// Each round hands you a start word and a random target. You get BUDGET_MULT x min moves to reach it.
 // Reach it and the target becomes your next start word with a fresh target; run out and the run is over.
-// Par climbs as the chain grows, so early links are a warm-up and later ones are proper puzzles.
+// Min climbs as the chain grows, so early links are a warm-up and later ones are proper puzzles.
 
 import { Game } from './game.js';
 
@@ -15,7 +15,7 @@ export const MIN_APPROACH = 40;
 const THEME_WEIGHT = { place: 0.7, people: 1, fiction: 1, brand: 0.8, culture: 1, space: 0.4, food: 1.2, animal: 1, plant: 0.6, object: 1.4, nature: 0.7, building: 0.9 };
 
 /** Shortest-route length for a round: 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, ... */
-export const parForRound = (round) => Math.min(8, 4 + Math.floor((round - 1) / 2));
+export const minForRound = (round) => Math.min(8, 4 + Math.floor((round - 1) / 2));
 
 export class EndlessRun {
   /**
@@ -41,11 +41,11 @@ export class EndlessRun {
     this._begin(start);
   }
 
-  get par() {
-    return this.game.puzzle.par;
+  get min() {
+    return this.game.puzzle.min;
   }
   get budget() {
-    return BUDGET_MULT * this.par;
+    return BUDGET_MULT * this.min;
   }
   /** Moves remaining this round (hints spend moves too). */
   get left() {
@@ -94,8 +94,8 @@ export class EndlessRun {
   }
 
   _begin(start, savedGame = null, savedPuzzle = null) {
-    const par = parForRound(this.round);
-    const puzzle = savedPuzzle || this._roll(start, par);
+    const min = minForRound(this.round);
+    const puzzle = savedPuzzle || this._roll(start, min);
     this.used.add(puzzle.target);
     this.game = new Game(this.world, puzzle, savedGame);
   }
@@ -123,7 +123,7 @@ export class EndlessRun {
     return list[Math.floor(this.rand() * list.length)];
   }
 
-  _roll(start, wantPar) {
+  _roll(start, wantMin) {
     const w = this.world;
     const d = w.forwardDist(start);
     const fresh = w.pool.filter((t) => t !== start && !this.used.has(t) && d[t] > 0);
@@ -137,8 +137,8 @@ export class EndlessRun {
       (t) => w.themeOf(t) !== here,
       () => true,
     ];
-    // prefer the exact par; otherwise the nearest available distance
-    const order = [0, -1, 1, -2, 2, -3, 3].map((k) => wantPar + k).filter((p) => p >= 3);
+    // prefer the exact min; otherwise the nearest available distance
+    const order = [0, -1, 1, -2, 2, -3, 3].map((k) => wantMin + k).filter((p) => p >= 3);
     let cands = [];
     outer: for (const ok of filters) {
       for (const p of order) {
@@ -148,7 +148,7 @@ export class EndlessRun {
     }
     if (!cands.length) cands = fresh.filter((t) => d[t] >= 3);
     const target = this._pickVaried(cands);
-    return { num: `e${this.round}`, start, target, par: d[target], startLabel: '', targetLabel: '' };
+    return { num: `e${this.round}`, start, target, min: d[target], startLabel: '', targetLabel: '' };
   }
 
   serialize() {
@@ -158,7 +158,7 @@ export class EndlessRun {
       v: 2, round: this.round, links: this.links, totalHops: this.totalHops,
       chain: this.chain.map((i) => w[i]), used: [...this.used].map((i) => w[i]),
       over: this.over, reason: this.reason,
-      puzzle: { start: w[p.start], target: w[p.target], par: p.par },
+      puzzle: { start: w[p.start], target: w[p.target], min: p.min },
       game: this.game.serialize(),
     };
   }
@@ -180,9 +180,9 @@ export class EndlessRun {
     this.used = new Set(used);
     this.over = !!s.over;
     this.reason = s.reason || null;
-    const par = this.world.distTo(target)[start];
-    if (!(par > 0)) return false; // the graph changed and this round is no longer solvable
-    const puzzle = { num: `e${this.round}`, start, target, par, startLabel: '', targetLabel: '' };
+    const min = this.world.distTo(target)[start];
+    if (!(min > 0)) return false; // the graph changed and this round is no longer solvable
+    const puzzle = { num: `e${this.round}`, start, target, min, startLabel: '', targetLabel: '' };
     this.game = new Game(this.world, puzzle, s.game);
     // saved mid-celebration: move on to the next round
     if (!this.over && this.game.status === 'won') this.advance();

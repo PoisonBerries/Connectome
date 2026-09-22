@@ -2,7 +2,7 @@
 
 A daily word game in the spirit of the Wikipedia link race. You start on one word and must reach another by hopping
 between related words. **Every word links to its five most related words**, nothing more. Get from A to B in as few
-hops as you can. A new puzzle arrives every day, and yours is scored against *par* (the true shortest route).
+hops as you can. A new puzzle arrives every day, and yours is scored against *min* (the true shortest route).
 
 The name is the theme: words are neurons, hops are synapses, and at the end you get to see the connectome you grew.
 
@@ -27,13 +27,13 @@ then push to `main`. All asset paths are relative, so it works under `https://<u
 |---|---|---|
 | Word graph | `web/data/graph.json` | ~7,500 nodes, 5 out-links each, one strongly-connected component (every word can reach every other) |
 | Daily puzzles | `web/data/puzzles.json` | 730 days, generated offline. Launch day was 2026-09-21 (#8); #1-#7 are archive puzzles for 9/14-9/20. Rolls over at the player's local midnight |
-| Game logic | `web/js/game.js`, `data.js` | Pure state machine + BFS (par, hints); unit-checked in `tests/` |
+| Game logic | `web/js/game.js`, `data.js` | Pure state machine + BFS (min, hints); unit-checked in `tests/` |
 | Look & feel | `web/js/stage.js`, `map.js`, `css/` | DOM buttons on an SVG synapse layer; canvas constellation of your explored network |
 | Saves & stats | `web/js/store.js` | localStorage only, no accounts, no backend |
 | Community stats | `web/js/firebase.js`, `firestore.rules` | optional; see [Community stats](#community-stats-optional) below |
 
-**Endless mode (∞):** a random start and target, with 5× par moves to connect them. Reach the target and it becomes your
-next start word with a fresh target and a fresh move budget; run out of moves and the run ends. Par ramps 4 → 8 over the
+**Endless mode (∞):** a random start and target, with 5× min moves to connect them. Reach the target and it becomes your
+next start word with a fresh target and a fresh move budget; run out of moves and the run ends. Min ramps 4 → 8 over the
 first ten links, hints spend moves, and your score is links chained. Rules live in `web/js/endless.js`; targets are drawn
 from the `e` (endpoint pool) list in `graph.json`.
 
@@ -41,10 +41,10 @@ from the `e` (endpoint pool) list in `graph.json`.
 (shows every word that links straight to the target), *Compass* +2 (highlights options on a shortest route), *Plasticity* +2
 (grows 3 extra links on the current word: the next 3 most related words after its usual five, from `graph.json`'s `x` field).
 Every hint is a one-time purchase per word — using it again on a word you already paid for is free, since it would just
-show the same thing. Rating tiers run from *Perfect wiring* (par) down to *Tangled*. The share text is spoiler-free:
+show the same thing. Rating tiers run from *Perfect wiring* (min) down to *Tangled*. The share text is spoiler-free:
 🟩 closer · 🟨 sideways · 🟥 farther.
 
-**Difficulty curve:** par is 5 on Monday/Tuesday, 6 on Wed/Thu, 7 on Fri/Sat, 8 on Sunday. A simple simulated
+**Difficulty curve:** min is 5 on Monday/Tuesday, 6 on Wed/Thu, 7 on Fri/Sat, 8 on Sunday. A simple simulated
 "semantic hill-climbing" player needs a median of ~15-28 clicks on these, matching typical human play.
 
 **Community stats:** once you finish a daily puzzle, the result screen shows how you compare — solve count, the

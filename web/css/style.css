@@ -223,8 +223,8 @@ main { flex: 1; display: flex; flex-direction: column; gap: 10px; min-height: 0;
 .hops small { font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin-top: 1px; }
 .hops.bump { animation: bump 0.35s var(--ease); }
 @keyframes bump { 40% { transform: scale(1.18); } }
-.par { font-size: 11px; color: var(--muted); letter-spacing: 0.04em; }
-.par b { color: var(--ink); font-weight: 700; }
+.min { font-size: 11px; color: var(--muted); letter-spacing: 0.04em; }
+.min b { color: var(--ink); font-weight: 700; }
 
 .gateways {
   display: flex;
@@ -783,7 +783,7 @@ dialog .row > * { flex: 1; }
 .hops.low span { color: var(--tgt); }
 @keyframes lowPulse { 50% { transform: scale(1.07); } }
 .hops.low.bump { animation: bump 0.35s var(--ease), lowPulse 1s 0.35s ease-in-out infinite; }
-.par .sep { color: var(--faint); padding: 0 2px; }
+.min .sep { color: var(--faint); padding: 0 2px; }
 
 .inf { color: var(--cur); }
 .endless-cta { width: 100%; margin-top: 14px; border-color: rgba(var(--cur-rgb), 0.45); }

@@ -57,15 +57,15 @@ export const TIERS = [
 ];
 
 /**
- * Rate a finished game by score (hops + hint penalties) against par.
- * Tuned so a typical player (roughly 2.5-3x par) lands mid-table rather than near the bottom.
+ * Rate a finished game by score (hops + hint penalties) against min.
+ * Tuned so a typical player (roughly 2.5-3x min) lands mid-table rather than near the bottom.
  */
-export function tierIndex(score, par) {
-  if (score <= par) return 0;
-  if (score <= Math.max(par + 3, par * 1.5)) return 1;
-  if (score <= par * 2.5) return 2;
-  if (score <= par * 3.5) return 3;
-  if (score <= par * 5) return 4;
+export function tierIndex(score, min) {
+  if (score <= min) return 0;
+  if (score <= Math.max(min + 3, min * 1.5)) return 1;
+  if (score <= min * 2.5) return 2;
+  if (score <= min * 3.5) return 3;
+  if (score <= min * 5) return 4;
   return 5;
 }
 

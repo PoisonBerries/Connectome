@@ -18,17 +18,17 @@ for (let i = 0; i < w.N; i++) {
 const d0 = w.distTo(w.index.get('Paris') ?? 0);
 assert(d0.every((x) => x >= 0), 'graph not strongly connected to Paris');
 
-// all puzzles: par matches the shipped value, and stays within the intended range
+// all puzzles: min matches the shipped value, and stays within the intended range
 let bad = 0;
-const parCounts = {};
+const minCounts = {};
 for (let n = 1; n <= w.puzzles.length; n++) {
   const pz = w.puzzleFor(n);
   const shipped = w.puzzles[n - 1];
-  if (pz.par !== shipped.par) bad++;
-  parCounts[pz.par] = (parCounts[pz.par] || 0) + 1;
+  if (pz.min !== shipped.min) bad++;
+  minCounts[pz.min] = (minCounts[pz.min] || 0) + 1;
 }
-assert.equal(bad, 0, 'shipped par differs from BFS par');
-console.log('par distribution', parCounts);
+assert.equal(bad, 0, 'shipped min differs from BFS min');
+console.log('min distribution', minCounts);
 
 // the calendar never pairs two words of the same theme (no Paris -> Austria)
 {
@@ -44,12 +44,12 @@ console.log('par distribution', parCounts);
 const pz = w.puzzleFor(1);
 const game = new Game(w, pz);
 const route = w.shortestPath(pz.start, pz.target);
-assert.equal(route.length - 1, pz.par);
+assert.equal(route.length - 1, pz.min);
 for (const step of route.slice(1)) assert(game.hop(step));
 assert.equal(game.status, 'won');
-assert.equal(game.score, pz.par);
-assert.equal(tierIndex(game.score, pz.par), 0);
-assert.deepEqual(game.hopTrend(), Array(pz.par).fill(1));
+assert.equal(game.score, pz.min);
+assert.equal(tierIndex(game.score, pz.min), 0);
+assert.deepEqual(game.hopTrend(), Array(pz.min).fill(1));
 
 // undo is free but hops stay counted; hints add penalty
 const g2 = new Game(w, pz);
@@ -66,9 +66,9 @@ assert.deepEqual(g3.path, g2.path); assert.equal(g3.score, g2.score);
 
 // give up reveals a valid optimal route from where you stand
 const g4 = new Game(w, pz); g4.giveUp();
-assert.equal(g4.revealed.length - 1, pz.par);
+assert.equal(g4.revealed.length - 1, pz.min);
 
-// tier thresholds (par 6): perfect<=6, prodigy<=9, synaptic<=15, neural<=21, wanderer<=30, tangled beyond
+// tier thresholds (min 6): perfect<=6, prodigy<=9, synaptic<=15, neural<=21, wanderer<=30, tangled beyond
 const tiers = [6, 7, 9, 10, 15, 16, 21, 22, 30, 31].map((sc) => tierIndex(sc, 6));
 assert.deepEqual(tiers, [0, 1, 1, 2, 2, 3, 3, 4, 4, 5]);
 assert.equal(tierIndex(8, 5), 1); assert.equal(tierIndex(12, 8), 1); assert.equal(tierIndex(13, 8), 2);
@@ -100,8 +100,8 @@ console.log('all game logic checks passed');
 
 // ---- endless mode
 {
-  const { EndlessRun, parForRound, BUDGET_MULT } = await import('../web/js/endless.js');
-  assert.deepEqual([1, 2, 3, 4, 5, 6, 9, 10, 20].map(parForRound), [4, 4, 5, 5, 6, 6, 8, 8, 8]);
+  const { EndlessRun, minForRound, BUDGET_MULT } = await import('../web/js/endless.js');
+  assert.deepEqual([1, 2, 3, 4, 5, 6, 9, 10, 20].map(minForRound), [4, 4, 5, 5, 6, 6, 8, 8, 8]);
 
   // deterministic RNG so the test is reproducible
   let seed = 7;
@@ -111,9 +111,9 @@ console.log('all game logic checks passed');
   for (let r = 1; r <= 12; r++) {
     const pz = run.game.puzzle;
     if (prevTarget !== null) assert.equal(pz.start, prevTarget, 'target becomes next start');
-    assert(pz.par >= 3 && pz.par <= 9, 'par in range');
+    assert(pz.min >= 3 && pz.min <= 9, 'min in range');
     assert.notEqual(w.themeOf(pz.start), w.themeOf(pz.target), `round ${r}: start and target share a theme`);
-    assert.equal(run.budget, BUDGET_MULT * pz.par);
+    assert.equal(run.budget, BUDGET_MULT * pz.min);
     assert.equal(run.left, run.budget);
     const route = w.shortestPath(pz.start, pz.target);
     let res;

@@ -6,6 +6,8 @@
 //
 // Data model (see ../../firestore.rules for what is actually enforced server-side):
 //   plays/{puzzle}_{uid}   one immutable doc per player per daily puzzle: {puzzle, uid, score, par, won, path, ts}
+//     (the app calls this 'min' everywhere else; the wire field stays 'par' so the deployed rules don't need
+//     re-publishing just for a label rename -- see submitDailyResult below for the one place they meet)
 //   puzzleStats/{puzzle}   an aggregate, updated with increment() on every finish (no read-modify-write needed):
 //     attempts   every finish, win or lose/give-up
 //     count      wins only — the denominator for "average" and "most common route"
@@ -78,7 +80,7 @@ const keyToPath = (key) => decodeURIComponent(key).split('|');
  * once per puzzle (main.js gates this on the same "first time this puzzle was recorded" check used for local stats).
  * @returns {Promise<boolean>} whether it was actually recorded.
  */
-export async function submitDailyResult(puzzleNum, { score, par, won, path }) {
+export async function submitDailyResult(puzzleNum, { score, min, won, path }) {
   try {
     const { fsMod, db, uid } = await load();
     const playRef = fsMod.doc(db, 'plays', `${puzzleNum}_${uid}`);
@@ -87,7 +89,7 @@ export async function submitDailyResult(puzzleNum, { score, par, won, path }) {
     const key = pathKey(path);
 
     await withTimeout(
-      fsMod.setDoc(playRef, { puzzle: puzzleNum, uid, score, par, won, path, ts: fsMod.serverTimestamp() })
+      fsMod.setDoc(playRef, { puzzle: puzzleNum, uid, score, par: min, won, path, ts: fsMod.serverTimestamp() })
     );
 
     // updateDoc() parses a dotted string key ("hist.5") as a real nested-field path, merging into just that one key

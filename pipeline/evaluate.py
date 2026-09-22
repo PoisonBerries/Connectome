@@ -3,7 +3,7 @@
 Structure:  reciprocity, tight cliques, lexical-overlap links, cross-topic links, in-degree extremes
 Distances:  mean / p95 shortest path
 Play:       a simulated semantic-hill-climbing player on a FIXED set of start/target pairs (the pairs both graphs share),
-            reporting solve rate and median clicks within the endless budget (5 x par).
+            reporting solve rate and median clicks within the endless budget (5 x min).
 Caveat: the simulated player steers by the same embedding the graph came from, so it under-rates links that are good for
 humans but far in vector space (bridges). Read its numbers as a floor on navigability, not the whole story.
 """
@@ -102,7 +102,7 @@ print("\nsimulated player on the same %d start/target pairs (budget = 5 x shorte
 pl = {t: play(G) for t, G in graphs.items()}
 print("mean shortest route".ljust(w) + "".join(f"{pl[t][0]:.2f}".rjust(12) for t in tags))
 for k in ("all", 5, 6, 7, 8):
-    lab = f"solve pct (par {k})" if k != "all" else "solve pct (all)"
+    lab = f"solve pct (min {k})" if k != "all" else "solve pct (all)"
     print(lab.ljust(w) + "".join(f"{pl[t][1][k][0]:.0f}".rjust(12) for t in tags))
-    lab = "median clicks (par %s)" % k if k != "all" else "median clicks (all)"
+    lab = "median clicks (min %s)" % k if k != "all" else "median clicks (all)"
     print(lab.ljust(w) + "".join(f"{pl[t][1][k][1]:.0f}".rjust(12) for t in tags))

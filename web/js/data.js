@@ -27,7 +27,7 @@ export class World {
     this.N = this.words.length;
     this.index = new Map(this.words.map((w, i) => [w, i]));
     this.epoch = p.epoch;
-    this.puzzles = p.puzzles.map(([s, t, par, sl, tl]) => ({ start: s, target: t, par, startLabel: sl, targetLabel: tl }));
+    this.puzzles = p.puzzles.map(([s, t, min, sl, tl]) => ({ start: s, target: t, min, startLabel: sl, targetLabel: tl }));
 
     // reverse adjacency (who links *to* a node)
     const inn = Array.from({ length: this.N }, () => []);
@@ -119,7 +119,7 @@ export class World {
     const start = this.index.get(p.start);
     const target = this.index.get(p.target);
     if (start === undefined || target === undefined) throw new Error(`Puzzle ${num} references unknown words`);
-    return { num, start, target, par: this.distTo(target)[start], startLabel: p.startLabel, targetLabel: p.targetLabel };
+    return { num, start, target, min: this.distTo(target)[start], startLabel: p.startLabel, targetLabel: p.targetLabel };
   }
 }
 

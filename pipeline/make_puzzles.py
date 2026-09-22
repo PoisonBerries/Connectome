@@ -23,7 +23,7 @@ os.makedirs(WEB, exist_ok=True)
 # Monday (easy) ... Sunday (hard): shortest-path length in hops
 DIST_BY_WEEKDAY = [5, 5, 6, 6, 7, 7, 8]
 COS_MAX = 0.22        # endpoints must be semantically unrelated, or the puzzle is trivial
-AGENT_MAX = 3.6       # a simple semantic-hill-climbing player must succeed within this many x par
+AGENT_MAX = 3.6       # a simple semantic-hill-climbing player must succeed within this many x min
 REUSE_GAP = 200       # days before an endpoint can reappear
 
 LABELS = {
@@ -116,7 +116,7 @@ def choose(day, rng, prev_themes):
                 m = agent_moves(nb, vecs @ vecs[ib], ia, ib)
                 if m is not None and m <= AGENT_MAX * want:
                     last_used[a] = last_used[b] = day
-                    return dict(start=words[ia], target=words[ib], par=int(want), agent=int(m),
+                    return dict(start=words[ia], target=words[ib], min=int(want), agent=int(m),
                                 sl=label(ia), tl=label(ib), _t=(t, themes[b]))
     raise SystemExit(f"no puzzle for day {day}")
 
@@ -135,19 +135,19 @@ if old and old.get("epoch") != EPOCH_OUT.isoformat():
 for idx in range(KEEP):
     if not old or idx >= len(old["puzzles"]):
         continue
-    s_, t_, par, sl, tl = old["puzzles"][idx]
+    s_, t_, min_, sl, tl = old["puzzles"][idx]
     gs, gt = word2idx.get(s_), word2idx.get(t_)
     if gs is None or gt is None or theme_of(G, gs) == theme_of(G, gt):
         continue
     # the graph may have changed since it was published: use the true shortest route now, and re-roll if the
     # difficulty has drifted more than a hop from what that weekday calls for
-    true_par = shortest_path(A, method="D", unweighted=True, indices=[gs])[0][gt]
+    true_min = shortest_path(A, method="D", unweighted=True, indices=[gs])[0][gt]
     want = DIST_BY_WEEKDAY[(EPOCH + dt.timedelta(days=idx - PAST_DAYS)).weekday()]
-    if not np.isfinite(true_par) or abs(true_par - want) > 1:
-        print(f"published puzzle #{idx + 1} ({s_} -> {t_}) drifted to par {true_par}; re-rolling")
+    if not np.isfinite(true_min) or abs(true_min - want) > 1:
+        print(f"published puzzle #{idx + 1} ({s_} -> {t_}) drifted to min {true_min}; re-rolling")
         continue
-    par = int(true_par)
-    puzzles[idx] = dict(start=s_, target=t_, par=par, agent=0, sl=sl, tl=tl, _t=(theme_of(G, gs), theme_of(G, gt)))
+    min_ = int(true_min)
+    puzzles[idx] = dict(start=s_, target=t_, min=min_, agent=0, sl=sl, tl=tl, _t=(theme_of(G, gs), theme_of(G, gt)))
     for g_ in (gs, gt):
         if g_ in pool_pos:
             last_used[pool_pos[g_]] = idx - PAST_DAYS
@@ -164,18 +164,18 @@ for idx in range(KEEP, TOTAL):
 
 for i in list(range(16)) + [100, 400, 700]:
     p = puzzles[i]
-    print(f"#{i+1:<4} {(EPOCH_OUT+dt.timedelta(days=i)).strftime('%a')}  {p['start']:>14} -> {p['target']:<14} par {p['par']}  agent {p['agent']:>2}  [{p['sl']} / {p['tl']}]")
+    print(f"#{i+1:<4} {(EPOCH_OUT+dt.timedelta(days=i)).strftime('%a')}  {p['start']:>14} -> {p['target']:<14} min {p['min']}  agent {p['agent']:>2}  [{p['sl']} / {p['tl']}]")
 
 # ------------------------------------------------------------------ ship
 out_graph = dict(w=words, k=[int(x) for x in kinds], n=[int(x) for x in nb.ravel()],
-                 x=[int(v) for v in G["extras"].ravel()],  # 3 extra 'octopus' links per word
+                 x=[int(v) for v in G["extras"].ravel()],  # 3 extra 'plasticity' links per word
                  e=[int(x) for x in pool],  # well-known endpoint words: the pool endless mode draws from
                  eg=[theme_names.index(t) for t in themes], gn=theme_names,
                  ea=[int(x) for x in approach])  # each endpoint's theme, for variety
 with open(os.path.join(WEB, "graph.json"), "w") as f:
     json.dump(out_graph, f, separators=(",", ":"))
 out_p = dict(epoch=EPOCH_OUT.isoformat(),
-             puzzles=[[p["start"], p["target"], p["par"], p["sl"], p["tl"]] for p in puzzles])
+             puzzles=[[p["start"], p["target"], p["min"], p["sl"], p["tl"]] for p in puzzles])
 with open(os.path.join(WEB, "puzzles.json"), "w") as f:
     json.dump(out_p, f, separators=(",", ":"))
 print("wrote", os.path.getsize(os.path.join(WEB, "graph.json")) // 1024, "KB graph;",

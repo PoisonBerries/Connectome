@@ -16,8 +16,8 @@ export function shareText(game, world, tier, url) {
   const head = `Connectome #${p.num} ${won ? t.emoji : '🌫️'}`;
   const route = `${world.words[p.start]} → ${world.words[p.target]}`;
   const meta = won
-    ? `${game.score} hops · par ${p.par}${game.hintsUsed ? ` · 💡×${game.hintsUsed}` : ''}`
-    : `Lost the signal after ${game.moves} hops · par ${p.par}`;
+    ? `${game.score} hops · min ${p.min}${game.hintsUsed ? ` · 💡×${game.hintsUsed}` : ''}`
+    : `Lost the signal after ${game.moves} hops · min ${p.min}`;
   return [head, route, meta, ...rows, url].filter(Boolean).join('\n');
 }
 
