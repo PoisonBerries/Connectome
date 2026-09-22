@@ -221,3 +221,43 @@ console.log('all game logic checks passed');
   assert.equal(legacy.path.length, 1);
   console.log('saves survive graph rebuilds');
 }
+
+// ---- octopus hint: 3 extra arms, once per word, saved/restored, folded into score and the discovered/map sets
+{
+  const gc = new Game(w, w.puzzleFor(3));
+  const startWord = gc.current;
+  assert.equal(gc.options.length, 5, 'starts with 5 options');
+  const extrasBefore = w.extras(gc.current);
+  if (extrasBefore.length) {
+    assert(gc.octopus(), 'first use works');
+    assert.equal(gc.options.length, 5 + extrasBefore.length, 'extra arms become options');
+    assert(!gc.octopus(), 'a second use on the same word does nothing');
+    assert.equal(gc.penalty, 2, 'charged once');
+    assert.deepEqual(new Set(gc.extraOptions), new Set(extrasBefore));
+    assert(gc.discovered().size >= gc.visited.size + extrasBefore.length);
+
+    const other = gc.options.find((o) => !gc.world.neighbors(startWord).includes(o));
+    assert(other !== undefined, 'an extra arm is actually reachable');
+    assert(gc.hop(other));
+    assert(!gc.hasOctopus(), 'the new word has no arms grown yet');
+    assert.equal(gc.options.length, 5, 'the new word starts with just its 5 links');
+
+    gc.undo();
+    assert.equal(gc.current, startWord);
+    assert(gc.hasOctopus(), 'coming back keeps the arms out');
+    assert.equal(gc.options.length, 5 + extrasBefore.length, 'still 8 options, for free');
+    assert.equal(gc.penalty, 2, 'no extra charge for revisiting');
+
+    const back = new Game(w, w.puzzleFor(3), JSON.parse(JSON.stringify(gc.serialize())));
+    assert(back.hasOctopus(startWord) && back.options.length === 5 + extrasBefore.length, 'arms survive save/restore');
+  }
+  // a word with no extras (rare, but the API must not lie about it)
+  let noExtra = null;
+  for (let i = 0; i < w.N; i++) if (w.extras(i).length === 0) { noExtra = i; break; }
+  if (noExtra !== null) {
+    const gg = new Game(w, { num: 1, start: noExtra, target: w.puzzleFor(1).target });
+    assert(!gg.octopus(), "octopus refuses when there's nothing to add");
+    assert.equal(gg.penalty, 0);
+  }
+  console.log('octopus hint checks passed');
+}

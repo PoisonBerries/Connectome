@@ -247,7 +247,8 @@ def build_graph(active):
     n = len(active)
     labels = kmeans2(V, args.clusters, minit="++", seed=0)[1] if args.bridge else None
     top_sets = [set(map(int, idxs[j, :15])) for j in range(n)] if args.mutual else None
-    out = np.full((n, 5), -1, dtype=np.int32)
+    # 5 real links, plus 3 'octopus' extras chosen by the same rules (the first five are unaffected by asking for more)
+    out = np.full((n, 8), -1, dtype=np.int32)
 
     def ok(i, b, chosen):
         return not related_forms(active[i], active[b]) and not any(related_forms(active[b], active[c]) for c in chosen)
@@ -260,7 +261,7 @@ def build_graph(active):
         C = (V[cand] @ V[cand].T) if args.diversity else None
         alive = np.ones(len(cand), bool)
         chosen, pos = [], []
-        while len(chosen) < 5:
+        while len(chosen) < 8:
             adj = score.copy()
             if args.diversity and pos:
                 adj -= args.diversity * C[:, pos].max(axis=1)
@@ -295,7 +296,7 @@ def build_graph(active):
 active = np.arange(len(words))
 for it in range(6):
     nb = build_graph(active)
-    mask, _ = largest_scc(nb)
+    mask, _ = largest_scc(nb[:, :5])
     short = (nb < 0).any(axis=1)
     print(f"iter {it}: n={len(active)} scc={mask.sum()} short={short.sum()}")
     keep = mask & ~short
@@ -307,10 +308,10 @@ nb = build_graph(active)
 n = len(active)
 final_words = [words[i] for i in active]
 final_kinds = kinds[active]
-np.savez(os.path.join(OUT, f"graph_{args.tag}.npz" if args.tag else "graph.npz"), words=np.array(final_words), kinds=final_kinds, nbrs=nb,
+np.savez(os.path.join(OUT, f"graph_{args.tag}.npz" if args.tag else "graph.npz"), words=np.array(final_words), kinds=final_kinds, nbrs=nb[:, :5], extras=nb[:, 5:8],
          vecs=vecs[active], ranks=np.array([nodes[keys[i]]["rank"] for i in active]),
          sections=np.array([nodes[keys[i]]["section"] for i in active]),
          zipf=np.array([zipf_frequency(nodes[keys[i]]["disp"].lower(), "en") for i in active], dtype=np.float32))
 print("final nodes:", n, "kinds:", np.bincount(final_kinds))
-indeg = np.bincount(nb.ravel(), minlength=n)
+indeg = np.bincount(nb[:, :5].ravel(), minlength=n)
 print("indeg min/median/max:", indeg.min(), np.median(indeg), indeg.max())

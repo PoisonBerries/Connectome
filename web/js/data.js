@@ -20,6 +20,8 @@ export class World {
     // how reachable each endpoint is by semantic steering (0-100); endless mode avoids the hard-to-reach ones
     this.approach = new Map();
     if (g.ea) this.pool.forEach((id, i) => this.approach.set(id, g.ea[i]));
+    // three extra 'octopus' links per word (the next most related after its five), only reachable via that hint
+    this.extra = g.x ? Int32Array.from(g.x) : null;
     this.kinds = g.k; // 0 word, 1 proper noun, 2 phrase
     this.out = Int32Array.from(g.n);
     this.N = this.words.length;
@@ -36,6 +38,13 @@ export class World {
 
   approachOf(id) {
     return this.approach.get(id) ?? 100;
+  }
+
+  /** The word's three octopus links (may be fewer, never more). */
+  extras(i) {
+    if (!this.extra) return [];
+    const o = this.extra;
+    return [o[i * 3], o[i * 3 + 1], o[i * 3 + 2]].filter((x) => x >= 0);
   }
 
   themeOf(id) {

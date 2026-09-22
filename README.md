@@ -37,8 +37,10 @@ first ten links, hints spend moves, and your score is links chained. Rules live 
 from the `e` (endpoint pool) list in `graph.json`.
 
 **Scoring (daily):** hops = every forward move (dead ends count; stepping back is free). Hints add to that: *Gateways* +1
-(shows every word that links straight to the target), *Compass* +2 (highlights options on a shortest route).
-Rating tiers run from *Perfect wiring* (par) down to *Tangled*. The share text is spoiler-free:
+(shows every word that links straight to the target), *Compass* +2 (highlights options on a shortest route), *Octopus* +2
+(grows 3 extra arms on the current word: the next 3 most related words after its usual five, from `graph.json`'s `x` field).
+Every hint is a one-time purchase per word — using it again on a word you already paid for is free, since it would just
+show the same thing. Rating tiers run from *Perfect wiring* (par) down to *Tangled*. The share text is spoiler-free:
 🟩 closer · 🟨 sideways · 🟥 farther.
 
 **Difficulty curve:** par is 5 on Monday/Tuesday, 6 on Wed/Thu, 7 on Fri/Sat, 8 on Sunday. A simple simulated

@@ -3,7 +3,7 @@
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const ANGLES = [-90, -18, 54, 126, 198].map((d) => (d * Math.PI) / 180); // pentagon, first option on top
-const LINE_WIDTH = [3.2, 2.8, 2.4, 2.0, 1.7]; // stronger link = thicker synapse
+const LINE_WIDTH = [3.2, 2.8, 2.4, 2.0, 1.7, 1.6, 1.5, 1.4]; // stronger link = thicker synapse
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
@@ -32,7 +32,8 @@ export class Stage {
     if (!W || !H) return;
     animate = animate && !first;
 
-    const geo = this.geometry(W, H);
+    const geo = this.geometry(W, H, view.options.length);
+    this.root.classList.toggle('dense', view.options.length > 5); // eight bubbles need slightly smaller type
     const wanted = new Map();
     wanted.set(view.current, { role: 'current', x: geo.cx, y: geo.cy });
     view.options.forEach((id, i) => wanted.set(id, { role: 'option', rank: i, x: geo.pts[i].x, y: geo.pts[i].y }));
@@ -93,12 +94,22 @@ export class Stage {
     this.drawLines(wanted, view, geo, animate);
   }
 
-  geometry(W, H) {
+  geometry(W, H, n = 5) {
     const cx = W / 2;
     const cy = H / 2;
-    const rx = clamp(W * 0.36, 96, 250);
-    const ry = clamp(H * 0.355, 108, 215);
-    const pts = ANGLES.map((a) => ({ x: cx + Math.cos(a) * rx, y: cy + Math.sin(a) * ry }));
+    if (n <= 5) {
+      const rx = clamp(W * 0.36, 96, 250);
+      const ry = clamp(H * 0.355, 108, 215);
+      const pts = ANGLES.map((a) => ({ x: cx + Math.cos(a) * rx, y: cy + Math.sin(a) * ry }));
+      return { cx, cy, pts };
+    }
+    // the octopus's eight arms: an even ring on a tall ellipse, rotated so no bubble sits on the far left/right edge
+    const rx = clamp(W * 0.375, 96, 260);
+    const ry = clamp(H * 0.425, 108, 230);
+    const pts = Array.from({ length: n }, (_, i) => {
+      const a = ((-90 + 180 / n + (360 / n) * i) * Math.PI) / 180;
+      return { x: cx + Math.cos(a) * rx, y: cy + Math.sin(a) * ry };
+    });
     return { cx, cy, pts };
   }
 
@@ -120,6 +131,7 @@ export class Stage {
     el.classList.add(spec.role);
     if (word.length > 10) el.classList.add('long');
     if (id === view.target) el.classList.add('is-target');
+    if (spec.role === 'option' && view.extras && view.extras.has(id)) el.classList.add('extra');
     if (spec.role === 'option') {
       if (view.visited.has(id)) el.classList.add('visited');
       if (view.compass && view.compass.has(id)) el.classList.add('hint');
@@ -133,6 +145,7 @@ export class Stage {
       k.setAttribute('aria-hidden', 'true');
       el.appendChild(k);
       const bits = [word, `option ${spec.rank + 1}`];
+      if (view.extras && view.extras.has(id)) bits.push('octopus arm');
       if (id === view.target) bits.push('the target');
       else if (view.visited.has(id)) bits.push('already visited');
       el.setAttribute('aria-label', bits.join(', '));
@@ -165,7 +178,7 @@ export class Stage {
 
       const base = document.createElementNS(SVG_NS, 'path');
       base.setAttribute('d', d);
-      base.setAttribute('class', 'syn base' + (id === view.target ? ' hot' : ''));
+      base.setAttribute('class', 'syn base' + (id === view.target ? ' hot' : '') + (view.extras && view.extras.has(id) ? ' extra' : ''));
       base.setAttribute('stroke-width', LINE_WIDTH[i]);
       base.setAttribute('stroke-opacity', 1 - i * 0.09);
       if (animate) {

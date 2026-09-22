@@ -1,5 +1,5 @@
 import { loadData, todayNumber, dateOfPuzzle, msUntilNextPuzzle } from './data.js';
-import { Game, GATEWAY_COST, COMPASS_COST } from './game.js';
+import { Game, GATEWAY_COST, COMPASS_COST, OCTOPUS_COST } from './game.js';
 import { Stage } from './stage.js';
 import { Ambient } from './ambient.js';
 import { drawConstellation } from './map.js';
@@ -149,6 +149,7 @@ function view() {
   return {
     current: g.current,
     options: frozen() ? [] : g.options,
+    extras: new Set(frozen() ? [] : g.extraOptions), // the octopus's three extra arms
     target: g.puzzle.target,
     visited: g.visited,
     words: state.world.words,
@@ -331,6 +332,24 @@ function useCompass() {
   sound.hint();
   render({ animate: false });
   toast(`Compass on · ${state.mode === 'endless' ? '−' : '+'}${COMPASS_COST} ${state.mode === 'endless' ? 'moves' : 'hops'}`);
+}
+
+function useOctopus() {
+  const g = state.game;
+  if (frozen()) return;
+  if (g.hasOctopus()) {
+    toast('The octopus already has its arms out here');
+    return;
+  }
+  if (!affordable(OCTOPUS_COST)) return;
+  if (!g.octopus()) {
+    toast('No extra arms to grow on this word');
+    return;
+  }
+  persist();
+  sound.hint();
+  render({ animate: true });
+  toast(`Octopus arms out · ${state.mode === 'endless' ? '−' : '+'}${OCTOPUS_COST} ${state.mode === 'endless' ? 'moves' : 'hops'}`);
 }
 
 function giveUp() {
@@ -625,6 +644,10 @@ function wireEvents() {
   $('btn-hint').onclick = () => {
     $('hint-gateways').disabled = state.game.gatewaysShown;
     $('hint-compass').disabled = state.game.hasCompass();
+    $('hint-octopus').disabled = state.game.hasOctopus();
+    $('hint-octopus').querySelector('small').textContent = state.game.hasOctopus()
+      ? 'Arms already out on this word. Hop somewhere new to use it again.'
+      : 'Grow three extra arms: the next three most related words.';
     $('hint-compass').querySelector('small').textContent = state.game.hasCompass()
       ? 'Already lit for this word. Hop somewhere new to use it again.'
       : 'Light up the options that sit on a shortest route from here.';
@@ -661,6 +684,7 @@ function wireEvents() {
 
   $('hint-gateways').onclick = () => { $('dlg-hint').close(); useGateways(); };
   $('hint-compass').onclick = () => { $('dlg-hint').close(); useCompass(); };
+  $('hint-octopus').onclick = () => { $('dlg-hint').close(); useOctopus(); };
   $('giveup-no').onclick = () => $('dlg-giveup').close();
   $('giveup-yes').onclick = () => { $('dlg-giveup').close(); giveUp(); };
 
@@ -717,7 +741,7 @@ function wireEvents() {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     if (document.querySelector('dialog[open]')) return;
     const g = state.game;
-    if (/^[1-5]$/.test(e.key) && !frozen()) {
+    if (/^[1-8]$/.test(e.key) && !frozen()) {
       const id = g.options[Number(e.key) - 1];
       const el = state.stage.optionEl(id);
       if (el && !el.classList.contains('locked')) pick(id);

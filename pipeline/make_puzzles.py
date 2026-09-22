@@ -168,6 +168,7 @@ for i in list(range(16)) + [100, 400, 700]:
 
 # ------------------------------------------------------------------ ship
 out_graph = dict(w=words, k=[int(x) for x in kinds], n=[int(x) for x in nb.ravel()],
+                 x=[int(v) for v in G["extras"].ravel()],  # 3 extra 'octopus' links per word
                  e=[int(x) for x in pool],  # well-known endpoint words: the pool endless mode draws from
                  eg=[theme_names.index(t) for t in themes], gn=theme_names,
                  ea=[int(x) for x in approach])  # each endpoint's theme, for variety

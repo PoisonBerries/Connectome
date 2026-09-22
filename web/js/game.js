@@ -2,6 +2,7 @@
 
 export const GATEWAY_COST = 1;
 export const COMPASS_COST = 2;
+export const OCTOPUS_COST = 2;
 
 export class Game {
   constructor(world, puzzle, saved = null) {
@@ -14,6 +15,7 @@ export class Game {
     this.visited = new Set([puzzle.start]);
     this.gatewaysShown = false;
     this.compassUses = 0; // paid uses
+    this.octopusNodes = new Set(); // words where the octopus has grown its three extra arms (once per word)
     this.compassNodes = new Set(); // words the compass has been used on (it is only ever bought once per word)
     this.status = 'playing'; // playing | won | gaveup
     this.revealed = null; // optimal path shown after giving up
@@ -25,13 +27,22 @@ export class Game {
     return this.path[this.path.length - 1];
   }
   get options() {
-    return this.world.neighbors(this.current);
+    return this.optionsAt(this.current);
+  }
+  /** Where you can hop from a word: its five links, plus three more if the octopus has been used there. */
+  optionsAt(node) {
+    const base = this.world.neighbors(node);
+    return this.octopusNodes.has(node) ? [...base, ...this.world.extras(node)] : base;
+  }
+  /** The octopus's extra options on the current word (empty until it is used). */
+  get extraOptions() {
+    return this.octopusNodes.has(this.current) ? this.world.extras(this.current) : [];
   }
   get moves() {
     return this.hops.length;
   }
   get penalty() {
-    return (this.gatewaysShown ? GATEWAY_COST : 0) + this.compassUses * COMPASS_COST;
+    return (this.gatewaysShown ? GATEWAY_COST : 0) + this.compassUses * COMPASS_COST + this.octopusNodes.size * OCTOPUS_COST;
   }
   get score() {
     return this.moves + this.penalty;
@@ -40,7 +51,7 @@ export class Game {
     return this.status !== 'playing';
   }
   get hintsUsed() {
-    return (this.gatewaysShown ? 1 : 0) + this.compassUses;
+    return (this.gatewaysShown ? 1 : 0) + this.compassUses + this.octopusNodes.size;
   }
   /** Distance from the current word to the target along the best route. */
   get remaining() {
@@ -50,7 +61,7 @@ export class Game {
   /** Everything the player has seen so far: visited words and every option offered from them. */
   discovered() {
     const seen = new Set(this.visited);
-    for (const v of this.visited) for (const n of this.world.neighbors(v)) seen.add(n);
+    for (const v of this.visited) for (const n of this.optionsAt(v)) seen.add(n);
     return seen;
   }
 
@@ -86,6 +97,17 @@ export class Game {
     if (this.over) return [];
     this.gatewaysShown = true;
     return this.world.gateways(this.puzzle.target);
+  }
+
+  hasOctopus(node = this.current) {
+    return this.octopusNodes.has(node);
+  }
+
+  /** Grow three extra arms: the next three most related words become hop options. Once per word. */
+  octopus() {
+    if (this.over || this.hasOctopus() || this.world.extras(this.current).length === 0) return false;
+    this.octopusNodes.add(this.current);
+    return true;
   }
 
   /** Has the compass already been used on this word? Using it again would show the same options for nothing. */
@@ -134,6 +156,7 @@ export class Game {
       gateways: this.gatewaysShown,
       compass: this.compassUses,
       compassAt: words([...this.compassNodes]),
+      octopusAt: words([...this.octopusNodes]),
       status: this.status,
       revealed: this.revealed ? words(this.revealed) : null,
     };
@@ -145,16 +168,17 @@ export class Game {
     const ids = (arr) => (Array.isArray(arr) ? arr.map((x) => idx.get(x)) : null);
     const path = ids(s.path);
     if (!path || path.some((x) => x === undefined) || path[0] !== this.puzzle.start) return;
+    this.octopusNodes = new Set((ids(s.octopusAt) || []).filter((x) => x !== undefined));
 
     // keep the longest prefix of the saved path that is still a valid chain in this build of the graph
     let keep = 1;
-    while (keep < path.length && this.world.neighbors(path[keep - 1]).includes(path[keep])) keep++;
+    while (keep < path.length && this.optionsAt(path[keep - 1]).includes(path[keep])) keep++;
     this.path = path.slice(0, keep);
 
     const d = this.dist;
     this.hops = s.hops
       .map(([f, t]) => [idx.get(f), idx.get(t)])
-      .filter(([f, t]) => f !== undefined && t !== undefined && this.world.neighbors(f).includes(t))
+      .filter(([f, t]) => f !== undefined && t !== undefined && this.optionsAt(f).includes(t))
       .map(([f, t]) => ({ from: f, to: t, before: d[f], after: d[t] }));
     const visited = (ids(s.visited) || []).filter((x) => x !== undefined);
     this.visited = new Set([...visited, ...this.path]);

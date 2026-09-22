@@ -130,3 +130,10 @@ except Exception:  # package missing: the hand-made lists above still apply
         return False
 
 BLOCKLIST |= set("slain slaying killings noose minefield adultery blockade cartel gallows hanging hanged lynching massacres".split())
+
+# Common-Crawl (GloVe 840B) picks up foreign function words with high raw frequency; these have no real
+# standalone English meaning even though they pass the zipf/WordNet checks (WordNet: "des" as DES the drug, "sur" not at all)
+# Common-Crawl (GloVe 840B) picks up a cluster of French function words with high raw frequency; they have no real
+# standalone English meaning even though a few pass the zipf/WordNet checks via an obscure English homograph
+# (des=DES the drug, cas=calcium/CA abbrev., plus=asset, rouge=makeup, para=parity, blanc/beau/rue/tout=rare/archaic).
+JUNK |= set("des sur cas tout plus rouge para blanc beau rue".split())

@@ -118,7 +118,7 @@ def theme_of(G, i):
 def load(path="out/graph.npz"):
     g = np.load(path)
     words = [str(w) for w in g["words"]]
-    return dict(words=words, nbrs=g["nbrs"], kinds=g["kinds"], cats=[str(c) for c in g["sections"]],
+    return dict(words=words, nbrs=g["nbrs"], extras=g["extras"] if "extras" in g.files else None, kinds=g["kinds"], cats=[str(c) for c in g["sections"]],
                 zipf=g["zipf"], vecs=g["vecs"], n=len(words))
 
 def adjacency(nb):

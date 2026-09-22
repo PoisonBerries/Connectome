@@ -796,3 +796,19 @@ dialog .row > * { flex: 1; }
 .chain .arr { color: var(--faint); font-size: 12px; }
 .route-label { margin-top: 10px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
 .route-label:first-child { margin-top: 4px; }
+
+/* ------------------------------------------------------------------ octopus arms */
+.stage.dense .node { font-size: 15px; padding: 8px 13px; }
+.stage.dense .node.long { font-size: 13.5px; padding: 7px 11px; }
+.stage.dense .node.current { font-size: 15px; }
+.node.extra {
+  border-color: rgba(var(--start-rgb), 0.75);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28), 0 0 26px rgba(var(--start-rgb), 0.28);
+}
+.node.extra:hover, .node.extra:focus-visible {
+  border-color: var(--start);
+  box-shadow: 0 0 0 4px rgba(var(--start-rgb), 0.16), 0 8px 28px rgba(0, 0, 0, 0.3), 0 0 36px rgba(var(--start-rgb), 0.5);
+}
+.syn.base.extra { stroke: var(--start); stroke-dasharray: 5 6; }
+.hint-opt#hint-octopus .hi { color: var(--start); }
+.hint-opt#hint-octopus em { color: var(--start); }

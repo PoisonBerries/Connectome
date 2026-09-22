@@ -71,7 +71,7 @@ export function drawConstellation(canvas, world, game, { animate = true } = {}) 
   const ids = new Set([...game.visited, puzzle.target, ...revealed]);
   const edges = [];
   for (const v of game.visited) {
-    for (const n of world.neighbors(v)) {
+    for (const n of game.optionsAt(v)) {
       ids.add(n);
       edges.push([v, n]);
     }
