@@ -73,6 +73,28 @@ const tiers = [6, 7, 9, 10, 15, 16, 21, 22, 30, 31].map((sc) => tierIndex(sc, 6)
 assert.deepEqual(tiers, [0, 1, 1, 2, 2, 3, 3, 4, 4, 5]);
 assert.equal(tierIndex(8, 5), 1); assert.equal(tierIndex(12, 8), 1); assert.equal(tierIndex(13, 8), 2);
 
+// compass: bought once per word, free when you come back to it, remembered across saves
+{
+  const gc = new Game(w, w.puzzleFor(2));
+  const startWord = gc.current;
+  assert(gc.compass(), 'first use works');
+  assert(!gc.compass(), 'second use on the same word is refused');
+  assert.equal(gc.compassUses, 1);
+  assert.equal(gc.penalty, 2, 'charged once');
+  assert(gc.compassOptions().length >= 1);
+  gc.hop(gc.options[0]);
+  assert(!gc.hasCompass(), 'a new word has no compass yet');
+  assert(gc.compass(), 'a different word can use it');
+  assert.equal(gc.penalty, 4);
+  gc.undo();
+  assert.equal(gc.current, startWord);
+  assert(gc.hasCompass(), 'coming back to a paid-for word keeps its compass');
+  assert(!gc.compass());
+  assert.equal(gc.penalty, 4, 'no extra charge for revisiting');
+  const back = new Game(w, w.puzzleFor(2), JSON.parse(JSON.stringify(gc.serialize())));
+  assert(back.hasCompass(startWord) && back.penalty === 4, 'compass words survive save/restore');
+}
+
 console.log('date of #1:', dateOfPuzzle(w, 1).toDateString(), '| today is #', todayNumber(w));
 console.log('all game logic checks passed');
 
@@ -144,9 +166,10 @@ console.log('all game logic checks passed');
   // hints spend moves and can't take the last one
   const h = new EndlessRun(w, { rand });
   assert(h.canAfford(2));
-  h.game.compass(); h.game.compass();
+  assert(h.game.compass(), 'first compass works');
+  assert(!h.game.compass(), 'a second compass on the same word does nothing');
   const spent = h.left;
-  assert.equal(spent, h.budget - 4);
+  assert.equal(spent, h.budget - 2, 'and costs nothing extra');
   assert(!h.canAfford(spent), 'a hint may not consume the final move');
 
   // save / restore, including mid-celebration

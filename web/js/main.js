@@ -18,7 +18,6 @@ const state = {
   stage: null,
   today: 1,
   settings: settingsStore.load(),
-  compass: null, // {node, ids:Set} valid only while you stay on that word
   lastTier: null,
   map: null,
   cal: null,
@@ -91,7 +90,6 @@ function loadPuzzle(num, { push = true } = {}) {
   state.map?.stop();
   const puzzle = world.puzzleFor(num);
   state.game = new Game(world, puzzle, saves.load(num));
-  state.compass = null;
   state.lastTier = null;
   state.dailyNum = num;
   state.mode = 'daily';
@@ -154,7 +152,7 @@ function view() {
     target: g.puzzle.target,
     visited: g.visited,
     words: state.world.words,
-    compass: state.compass && state.compass.node === g.current ? state.compass.ids : null,
+    compass: g.hasCompass() ? new Set(g.compassOptions()) : null, // paid for once per word; returns free when you revisit it
   };
 }
 
@@ -255,7 +253,6 @@ function pick(id) {
   const res = state.mode === 'endless' ? state.run.hop(id) : (() => { const rec = g.hop(id); return rec && { rec, won: g.status === 'won' }; })();
   if (!res) return;
   const rec = res.rec;
-  state.compass = null;
   persist();
 
   const progress = g.puzzle.par ? clamp(1 - g.dist[id] / Math.max(1, g.dist[g.puzzle.start]), 0, 1) : 0;
@@ -285,7 +282,6 @@ function undo() {
   if (frozen() || !g.canUndo()) return;
   const from = state.stage.centerOf(g.current);
   g.undo();
-  state.compass = null;
   persist();
   sound.back();
   render({ from });
@@ -296,7 +292,6 @@ function jumpTo(i) {
   if (frozen()) return;
   const from = state.stage.centerOf(g.current);
   if (!g.jumpTo(i)) return;
-  state.compass = null;
   persist();
   sound.back();
   render({ from });
@@ -325,9 +320,13 @@ function useGateways() {
 
 function useCompass() {
   const g = state.game;
-  if (frozen() || !affordable(COMPASS_COST)) return;
-  const ids = new Set(g.compass());
-  state.compass = { node: g.current, ids };
+  if (frozen()) return;
+  if (g.hasCompass()) {
+    toast('The compass is already lit for this word');
+    return;
+  }
+  if (!affordable(COMPASS_COST)) return;
+  g.compass();
   persist();
   sound.hint();
   render({ animate: false });
@@ -369,7 +368,6 @@ function enterEndless() {
   state.run = new EndlessRun(state.world, { saved: endlessStore.run() });
   state.mode = 'endless';
   state.game = state.run.game;
-  state.compass = null;
   state.endlessResult = null;
   persist();
   paintMode();
@@ -407,8 +405,7 @@ function roundWon() {
     if (state.run !== run || state.mode !== 'endless' || run.over) return;
     run.advance();
     state.game = run.game;
-    state.compass = null;
-    persist();
+      persist();
     paintMode();
     paintMission();
     render({ animate: true });
@@ -627,6 +624,10 @@ function wireEvents() {
   $('btn-undo').onclick = undo;
   $('btn-hint').onclick = () => {
     $('hint-gateways').disabled = state.game.gatewaysShown;
+    $('hint-compass').disabled = state.game.hasCompass();
+    $('hint-compass').querySelector('small').textContent = state.game.hasCompass()
+      ? 'Already lit for this word. Hop somewhere new to use it again.'
+      : 'Light up the options that sit on a shortest route from here.';
     openDialog('dlg-hint');
   };
   $('btn-map').onclick = openMap;

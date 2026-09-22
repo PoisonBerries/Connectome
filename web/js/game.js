@@ -13,7 +13,8 @@ export class Game {
     this.hops = []; // every forward move ever made: {from, to, before, after}  (dead ends included)
     this.visited = new Set([puzzle.start]);
     this.gatewaysShown = false;
-    this.compassUses = 0;
+    this.compassUses = 0; // paid uses
+    this.compassNodes = new Set(); // words the compass has been used on (it is only ever bought once per word)
     this.status = 'playing'; // playing | won | gaveup
     this.revealed = null; // optimal path shown after giving up
 
@@ -87,12 +88,23 @@ export class Game {
     return this.world.gateways(this.puzzle.target);
   }
 
-  /** Options that lie on a shortest route to the target. Costs a penalty each time it is used. */
-  compass() {
-    if (this.over) return [];
-    this.compassUses += 1;
+  /** Has the compass already been used on this word? Using it again would show the same options for nothing. */
+  hasCompass(node = this.current) {
+    return this.compassNodes.has(node);
+  }
+
+  /** Options from the current word that lie on a shortest route to the target. */
+  compassOptions() {
     const d = this.dist;
     return this.options.filter((n) => d[n] === d[this.current] - 1);
+  }
+
+  /** Light up the best next hops. Costs a penalty once per word; returns false if it was already used here. */
+  compass() {
+    if (this.over || this.hasCompass()) return false;
+    this.compassUses += 1;
+    this.compassNodes.add(this.current);
+    return true;
   }
 
   giveUp() {
@@ -121,6 +133,7 @@ export class Game {
       visited: words([...this.visited]),
       gateways: this.gatewaysShown,
       compass: this.compassUses,
+      compassAt: words([...this.compassNodes]),
       status: this.status,
       revealed: this.revealed ? words(this.revealed) : null,
     };
@@ -147,6 +160,7 @@ export class Game {
     this.visited = new Set([...visited, ...this.path]);
     this.gatewaysShown = !!s.gateways;
     this.compassUses = s.compass | 0;
+    this.compassNodes = new Set((ids(s.compassAt) || []).filter((x) => x !== undefined));
     const revealed = ids(s.revealed);
     this.revealed = revealed && revealed.every((x) => x !== undefined) ? revealed : null;
     this.status = ['playing', 'won', 'gaveup'].includes(s.status) ? s.status : 'playing';
