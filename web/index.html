@@ -210,29 +210,41 @@
   </dialog>
 
   <!-- Result -->
-  <dialog id="dlg-result" aria-labelledby="res-title">
+  <dialog id="dlg-result" class="res-dialog" aria-labelledby="res-title">
     <form method="dialog" class="dlg-close"><button class="icon-btn" data-icon="close" aria-label="Close"></button></form>
-    <div class="res-head">
-      <div class="res-emoji" id="res-emoji"></div>
-      <h2 id="res-title"></h2>
-      <p class="lede" id="res-sub"></p>
+    <div class="res-cols">
+      <div class="res-col">
+        <div class="res-head">
+          <div class="res-emoji" id="res-emoji"></div>
+          <h2 id="res-title"></h2>
+          <p class="lede" id="res-sub"></p>
+        </div>
+        <div class="res-stats" id="res-stats"></div>
+        <div class="row">
+          <button class="btn primary" id="btn-share" data-icon="share"><span>Share</span></button>
+          <button class="btn" id="btn-copy" data-icon="copy"><span>Copy</span></button>
+        </div>
+      </div>
+      <div class="res-col">
+        <canvas class="constellation" id="res-canvas"></canvas>
+        <details class="route" id="res-route"><summary>The shortest route</summary><div id="res-route-body"></div></details>
+        <div class="community" id="community" hidden>
+          <h3>Community</h3>
+          <div class="res-stats" id="community-row"></div>
+          <details class="route" id="community-route" hidden><summary>Most common route</summary><div id="community-route-body"></div></details>
+        </div>
+      </div>
     </div>
-    <div class="res-stats" id="res-stats"></div>
-    <div class="row">
-      <button class="btn primary" id="btn-share" data-icon="share"><span>Share</span></button>
-      <button class="btn" id="btn-copy" data-icon="copy"><span>Copy</span></button>
+    <div class="res-cols">
+      <div class="res-col">
+        <pre class="share-preview" id="share-preview"></pre>
+      </div>
+      <div class="res-col">
+        <button class="btn wide endless-cta" id="btn-to-endless"><span>Keep going: Endless mode <b>∞</b></span></button>
+        <div class="res-mini" id="res-mini"></div>
+        <div class="next" id="res-next"></div>
+      </div>
     </div>
-    <canvas class="constellation" id="res-canvas"></canvas>
-    <details class="route" id="res-route"><summary>The shortest route</summary><div id="res-route-body"></div></details>
-    <div class="community" id="community" hidden>
-      <h3>Community</h3>
-      <div class="res-stats" id="community-row"></div>
-      <details class="route" id="community-route" hidden><summary>Most common route</summary><div id="community-route-body"></div></details>
-    </div>
-    <pre class="share-preview" id="share-preview"></pre>
-    <button class="btn wide endless-cta" id="btn-to-endless"><span>Keep going: Endless mode <b>∞</b></span></button>
-    <div class="res-mini" id="res-mini"></div>
-    <div class="next" id="res-next"></div>
   </dialog>
 
 
@@ -251,23 +263,35 @@
   </dialog>
 
   <!-- Endless run over -->
-  <dialog id="dlg-endless-over" aria-labelledby="eo-title">
+  <dialog id="dlg-endless-over" class="res-dialog" aria-labelledby="eo-title">
     <form method="dialog" class="dlg-close"><button class="icon-btn" data-icon="close" aria-label="Close"></button></form>
-    <div class="res-head">
-      <div class="res-emoji" id="eo-emoji">🔗</div>
-      <h2 id="eo-title"></h2>
-      <p class="lede" id="eo-sub"></p>
+    <div class="res-cols">
+      <div class="res-col">
+        <div class="res-head">
+          <div class="res-emoji" id="eo-emoji">🔗</div>
+          <h2 id="eo-title"></h2>
+          <p class="lede" id="eo-sub"></p>
+        </div>
+        <div class="res-stats" id="eo-stats"></div>
+        <div class="chain" id="eo-chain" aria-label="Your chain"></div>
+      </div>
+      <div class="res-col">
+        <canvas class="constellation" id="eo-canvas"></canvas>
+        <details class="route" id="eo-route" open><summary>The shortest route</summary><div id="eo-route-body"></div></details>
+      </div>
     </div>
-    <div class="res-stats" id="eo-stats"></div>
-    <div class="chain" id="eo-chain" aria-label="Your chain"></div>
-    <canvas class="constellation" id="eo-canvas"></canvas>
-    <details class="route" id="eo-route" open><summary>The shortest route</summary><div id="eo-route-body"></div></details>
-    <pre class="share-preview" id="eo-share"></pre>
-    <div class="row">
-      <button class="btn primary" id="eo-share-btn" data-icon="share"><span>Share</span></button>
-      <button class="btn" id="eo-again"><span>Play again</span></button>
+    <div class="res-cols">
+      <div class="res-col">
+        <pre class="share-preview" id="eo-share"></pre>
+      </div>
+      <div class="res-col">
+        <div class="row">
+          <button class="btn primary" id="eo-share-btn" data-icon="share"><span>Share</span></button>
+          <button class="btn" id="eo-again"><span>Play again</span></button>
+        </div>
+        <button class="btn wide" id="eo-daily" style="margin-top:10px">Back to the daily</button>
+      </div>
     </div>
-    <button class="btn wide" id="eo-daily" style="margin-top:10px">Back to the daily</button>
   </dialog>
 
   <div class="toasts" id="toasts" aria-live="polite"></div>

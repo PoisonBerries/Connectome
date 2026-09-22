@@ -818,3 +818,17 @@ dialog .row > * { flex: 1; }
 .community h3 { margin: 20px 0 10px; }
 .community .res-stats { margin-top: 0; }
 .community .route { margin-top: 10px; }
+
+/* ------------------------------------------------------------------ wide-screen results layout */
+/* Narrow/short screens (the default): .res-cols and .res-col are plain blocks, so their children stack in exactly
+   the same order and look as if the wrapper divs weren't there at all - this is what keeps mobile untouched. */
+@media (min-width: 760px) and (min-height: 760px) {
+  .res-dialog { width: min(90vw, 740px); max-height: min(92dvh, 920px); }
+  .res-cols {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+    gap: 4px 28px;
+  }
+  .res-cols + .res-cols { margin-top: 16px; }
+}
