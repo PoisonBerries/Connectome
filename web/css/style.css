@@ -392,11 +392,11 @@ main { flex: 1; display: flex; flex-direction: column; gap: 10px; min-height: 0;
 /* A brief colored flash on the word you just hopped to, echoing the hop sound's own closer/sideways/farther
    cue (the same trend value that drives the extra low undertone and the share screen's 🟩🟨🟥). Recolors the
    whole node, not just its glow, so it reads clearly rather than blending into the node's usual cyan glow. */
-.node.current.trend-up { animation: trendFlash 0.9s var(--ease); --trend: var(--start); --trend-rgb: var(--start-rgb); }
-.node.current.trend-flat { animation: trendFlash 0.9s var(--ease); --trend: var(--warn); --trend-rgb: var(--warn-rgb); }
-.node.current.trend-down { animation: trendFlash 0.9s var(--ease); --trend: var(--tgt); --trend-rgb: var(--tgt-rgb); }
+.node.current.trend-up { animation: trendFlash 1.4s var(--ease); --trend: var(--start); --trend-rgb: var(--start-rgb); }
+.node.current.trend-flat { animation: trendFlash 1.4s var(--ease); --trend: var(--warn); --trend-rgb: var(--warn-rgb); }
+.node.current.trend-down { animation: trendFlash 1.4s var(--ease); --trend: var(--tgt); --trend-rgb: var(--tgt-rgb); }
 @keyframes trendFlash {
-  0%, 30% {
+  0%, 50% {
     background: linear-gradient(135deg, var(--trend), color-mix(in srgb, var(--trend) 55%, var(--opt)));
     border-color: var(--trend);
     box-shadow: 0 0 0 7px rgba(var(--trend-rgb), 0.45), 0 0 50px rgba(var(--trend-rgb), 0.95), 0 0 120px rgba(var(--trend-rgb), 0.55);
