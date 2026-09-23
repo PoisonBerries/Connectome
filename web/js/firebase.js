@@ -16,6 +16,9 @@
 //     firstWord.K  wins whose first hop (the word right after the start) encodes to key K
 //     lastWord.K   wins whose last hop before the target encodes to key K
 //     (K = encodeURIComponent(word); a single word, not a whole path, is small enough to just show plainly)
+//   endlessRecord/global   one doc, the longest chain any player has ever reported: {links, hops, ts}. Number
+//     only, never a word chain — this is shown to every player, and unlike the rest of this file there is no
+//     private per-uid record backing it, so nothing here should ever be sensitive or offensive if faked.
 
 const SDK = 'https://www.gstatic.com/firebasejs/12.19.0';
 const HIST_CAP = 40;
@@ -180,4 +183,35 @@ export function percentileBetterThan(hist, score) {
   let worse = 0;
   for (const [k, n] of Object.entries(hist)) if (Number(k) > score) worse += n;
   return Math.round((100 * worse) / total);
+}
+
+/** @returns {Promise<null|{links:number, hops:number}>} the global endless record, or {links:0,hops:0} if none set yet. */
+export async function fetchEndlessRecord() {
+  try {
+    const { fsMod, db } = await load();
+    const snap = await withTimeout(fsMod.getDoc(fsMod.doc(db, 'endlessRecord', 'global')));
+    if (!snap.exists()) return { links: 0, hops: 0 };
+    const d = snap.data();
+    return { links: d.links || 0, hops: d.hops || 0 };
+  } catch (e) {
+    console.warn('[connectome] could not load the endless record:', e && e.message);
+    return null;
+  }
+}
+
+/**
+ * Attempts to claim a new global endless record. Safe to call whenever a run ends with more links than the last
+ * known record — the security rules, not this function, are what actually enforce "only if it's a real
+ * improvement", so a rejected attempt here just means someone else's write already got there first, which is a
+ * normal outcome, not an error.
+ * @returns {Promise<boolean>} whether this write was actually accepted as the new record.
+ */
+export async function submitEndlessRecord(links, hops) {
+  try {
+    const { fsMod, db } = await load();
+    await withTimeout(fsMod.setDoc(fsMod.doc(db, 'endlessRecord', 'global'), { links, hops, ts: fsMod.serverTimestamp() }));
+    return true;
+  } catch (e) {
+    return false;
+  }
 }

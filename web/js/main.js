@@ -8,7 +8,7 @@ import { sound, haptic } from './sound.js';
 import { settings as settingsStore, saves, stats as statsStore, endless as endlessStore, TIERS, tierIndex } from './store.js';
 import { EndlessRun, minForRound } from './endless.js';
 import { hydrateIcons } from './icons.js';
-import { submitDailyResult, fetchDailyStats, percentileBetterThan } from './firebase.js';
+import { submitDailyResult, fetchDailyStats, percentileBetterThan, fetchEndlessRecord, submitEndlessRecord } from './firebase.js';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -577,6 +577,22 @@ function openEndlessOver() {
   openDialog('dlg-endless-over');
   state.map?.stop();
   requestAnimationFrame(() => (state.map = drawConstellation($('eo-canvas'), world, run.game, { animate: state.settings.motion })));
+  loadEndlessRecord(run); // fire-and-forget: the global record is optional flavor, never holds up the results screen
+}
+
+/** The global longest-chain record across every player, added to the results stats once fetched; claims a new
+ * record if this run just beat it. Silently does nothing if Firebase is unavailable, same as daily's community stats. */
+async function loadEndlessRecord(run) {
+  let record = await fetchEndlessRecord();
+  if (state.run !== run || !$('dlg-endless-over').open) return; // the screen moved on while this was in flight
+  if (record && run.links > record.links) {
+    const claimed = await submitEndlessRecord(run.links, run.totalHops);
+    if (state.run !== run || !$('dlg-endless-over').open) return;
+    record = claimed ? { links: run.links, hops: run.totalHops } : await fetchEndlessRecord();
+    if (state.run !== run || !$('dlg-endless-over').open) return;
+  }
+  if (!record) return;
+  $('eo-stats').insertAdjacentHTML('beforeend', `<div class="stat"><b>${record.links}</b><small>World</small></div>`);
 }
 
 // ------------------------------------------------------------------ dialogs

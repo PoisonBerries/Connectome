@@ -5,7 +5,8 @@
 //   npx firebase emulators:exec --only firestore,auth --project demo-connectome "node tests/firestore.rules.test.mjs"
 //
 // or just `npm run test:rules`, which does the same thing. This is separate from tests/game.test.mjs (which has no
-// such dependency) and is not part of the GitHub Actions workflow, since CI has no reason to install a JVM for it.
+// such dependency); CI runs it as its own `test-rules` job (with Java installed via actions/setup-java) that's
+// independent of `deploy`, since the rules are published separately to the Firebase console, not part of the site.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
@@ -121,6 +122,24 @@ try {
   // ---- reads
   ok('reading the public aggregate requires only being signed in', await succeeds(getDoc(doc(alice.firestore(), stats(10)))));
   ok('reading the aggregate while signed out is refused', await fails(getDoc(doc(anon.firestore(), stats(10)))));
+
+  // ---- endlessRecord: a single global "longest chain" number, only ever movable upward
+  const record = doc(alice.firestore(), 'endlessRecord/global');
+  const goodRecord = (overrides = {}) => ({ links: 10, hops: 40, ts: serverTimestamp(), ...overrides });
+
+  ok('signed-out cannot create the record', await fails(setDoc(doc(anon.firestore(), 'endlessRecord/global'), goodRecord())));
+  ok('links out of range is refused', await fails(setDoc(record, goodRecord({ links: 0 }))));
+  ok('links above the plausibility cap is refused', await fails(setDoc(record, goodRecord({ links: 501 }))));
+  ok('hops less than links is refused (can\'t chain N links in fewer than N hops)', await fails(setDoc(record, goodRecord({ links: 10, hops: 5 }))));
+  ok('a spoofed ts instead of serverTimestamp is refused', await fails(setDoc(record, goodRecord({ ts: new Date() }))));
+  ok('a signed-in user can set the first-ever record', await succeeds(setDoc(record, goodRecord())));
+
+  ok('an update that does not beat the current record is refused', await fails(setDoc(doc(bob.firestore(), 'endlessRecord/global'), goodRecord({ links: 10 }))));
+  ok('an update with fewer links than the current record is refused', await fails(setDoc(doc(bob.firestore(), 'endlessRecord/global'), goodRecord({ links: 4 }))));
+  ok('an update that genuinely beats the current record succeeds', await succeeds(setDoc(doc(bob.firestore(), 'endlessRecord/global'), goodRecord({ links: 11, hops: 44 }))));
+  ok('the record now reflects the higher value', (await getDoc(record)).data().links === 11);
+  ok('deleting the record is always refused', await fails(deleteDoc(record)));
+  ok('reading the record while signed out is refused', await fails(getDoc(doc(anon.firestore(), 'endlessRecord/global'))));
 
   console.log(`\n${n} checks run`);
 } finally {

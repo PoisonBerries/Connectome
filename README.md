@@ -57,8 +57,11 @@ thing anyway). Rating tiers run from *Perfect wiring* (min) down to *Tangled*. T
 **Community stats:** once you finish a daily puzzle, the result screen shows how you compare — solve count, the
 average number of hops, the percentage of solvers you beat (wins only; a give-up doesn't get a percentile), and the
 most common first hop and the most common word right before the target (shown plainly, not behind a click — a single
-word each isn't much of a spoiler). This is entirely optional: the game works exactly the same without it, just
-without that section. See [Community stats (optional)](#community-stats-optional) to turn it on.
+word each isn't much of a spoiler). Endless mode's results screen shows one more thing built on the same backend:
+"World", the longest chain any player has ever reported globally (a single number, never the actual chain of words —
+see [Community stats (optional)](#community-stats-optional) for why). This is entirely optional: the game works
+exactly the same without it, just without those numbers. See [Community stats (optional)](#community-stats-optional)
+to turn it on.
 
 ## Community stats (optional)
 
@@ -83,6 +86,12 @@ and it isn't stored on the aggregate at all. `web/js/firebase.js` has the full d
    filled in for `connectome-53d32`; change them too if you're pointing this at a different Firebase project).
 6. Commit and push. That's it — no server to run, no environment variables, nothing to deploy beyond the rules.
 
+Re-running step 3 (or `firebase deploy --only firestore:rules`) is required any time `firestore.rules` changes in
+this repo — pushing to `main` only redeploys the static site, never the rules, so an update sitting in the repo but
+not republished this way has no effect and any write it was meant to newly allow just gets silently rejected by the
+still-live older rules (best-effort call sites in `firebase.js` swallow that, so nothing breaks, it just quietly
+doesn't record).
+
 **Threat model, stated plainly:** there's no backend verifying a puzzle was actually solved (that needs a Cloud
 Function, which needs the paid Blaze plan — still free up to a large quota, just requires a card on file). The rules
 stop the cheap kind of tampering: writing arbitrary numbers into the aggregate, resubmitting the same puzzle to pad
@@ -90,6 +99,15 @@ it, or forging someone else's ID. They can't stop someone from opening devtools,
 and submitting one fabricated-but-plausible play. That's an accepted limitation of a free, backend-less setup — if it
 ever becomes a real problem, the fix is moving the aggregate update into a Cloud Function that checks the path against
 the actual graph before trusting it.
+
+The endless "World" record is the same limitation with a sharper edge: `puzzleStats` is an aggregate, where one bad
+write barely nudges an average, but a record is a max — one fabricated submission overwrites it outright, and it
+stays overwritten (visible to everyone) until someone fakes a bigger one. The rules narrow this as much as they
+reasonably can without a Cloud Function (an update must strictly beat the current value, and both `links` and `hops`
+are capped well beyond anything a genuine run could plausibly reach), but they can't verify a chain was actually
+played, same as everywhere else in this file. That tradeoff is why the record shows only a number, never the actual
+chain of words — the existing per-player data here is already private (`plays` docs are `allow read: if false`); a
+public leaderboard of unverified, player-submitted word sequences would be a new and different kind of exposure.
 
 **Testing the rules:** `tests/firestore.rules.test.mjs` exercises `firestore.rules` against a local emulator (not
 your real project — no credentials touched), and runs as its own check in CI (`.github/workflows/pages.yml`) on every

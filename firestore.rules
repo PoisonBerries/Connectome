@@ -92,5 +92,23 @@ service cloud.firestore {
       allow update: if isSignedIn() && hasPlayRecord(puzzleId) && isValidStats(request.resource.data)
         && isPlausibleDelta(resource.data, request.resource.data);
     }
+
+    // The single global "longest chain" record for endless mode. A number, never a word chain — this is shown to
+    // every player with no per-uid record behind it, unlike everything else in this file, so there is nothing here
+    // that could ever be sensitive or offensive if faked. There is also no server verifying a chain was actually
+    // played (same accepted limitation as the rest of this file), but unlike an aggregate, a max is fully
+    // overwritten by one bad write rather than merely nudged, so it matters more here that an update can only ever
+    // move the record up, never down or sideways, and only within a bound no genuine run could plausibly clear.
+    match /endlessRecord/global {
+      allow read: if isSignedIn();
+      allow delete: if false;
+      function isValidRecord(d) {
+        return d.links is int && d.links >= 1 && d.links <= 500
+          && d.hops is int && d.hops >= d.links && d.hops <= 6000
+          && d.ts == request.time;
+      }
+      allow create: if isSignedIn() && isValidRecord(request.resource.data);
+      allow update: if isSignedIn() && isValidRecord(request.resource.data) && request.resource.data.links > resource.data.links;
+    }
   }
 }
