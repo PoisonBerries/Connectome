@@ -156,6 +156,7 @@ function view() {
     visited: g.visited,
     words: state.world.words,
     compass: g.hasCompass() ? new Set(g.compassOptions()) : null, // stays lit here if this is the word it was used on
+    lastTrend: g.hops.length ? Math.sign(g.hops[g.hops.length - 1].before - g.hops[g.hops.length - 1].after) : null,
   };
 }
 

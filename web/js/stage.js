@@ -131,6 +131,9 @@ export class Stage {
     el.classList.add(spec.role);
     if (word.length > 10) el.classList.add('long');
     if (id === view.target) el.classList.add('is-target');
+    if (spec.role === 'current' && view.lastTrend !== null) {
+      el.classList.add(view.lastTrend > 0 ? 'trend-up' : view.lastTrend < 0 ? 'trend-down' : 'trend-flat');
+    }
     if (spec.role === 'option' && view.extras && view.extras.has(id)) el.classList.add('extra');
     if (spec.role === 'option') {
       if (view.visited.has(id)) el.classList.add('visited');
@@ -220,9 +223,9 @@ export class Stage {
   pulseTrend(trend) {
     const el = this.nodes.get(this.view?.current);
     if (!el) return;
-    el.classList.remove('trend-up', 'trend-flat', 'trend-down');
+    el.classList.remove('flash-up', 'flash-flat', 'flash-down');
     void el.offsetWidth;
-    el.classList.add(trend > 0 ? 'trend-up' : trend < 0 ? 'trend-down' : 'trend-flat');
+    el.classList.add(trend > 0 ? 'flash-up' : trend < 0 ? 'flash-down' : 'flash-flat');
   }
 
   shake(id) {

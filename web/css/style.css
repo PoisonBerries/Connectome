@@ -16,11 +16,11 @@
 
   --cur: #6cf1ff;   --cur-rgb: 108, 241, 255;
   --opt: #a99bff;   --opt-rgb: 169, 155, 255;
-  --tgt: #ff5fa2;   --tgt-rgb: 255, 95, 162;
-  --start: #7dffb5; --start-rgb: 125, 255, 181;
+  --tgt: #7dffb5;   --tgt-rgb: 125, 255, 181;
+  --start: #ff5fa2; --start-rgb: 255, 95, 162;
   --good: #46e39a;
   --warn: #ffd166;   --warn-rgb: 255, 209, 102;
-  --bad: #ff6b81;
+  --bad: #ff6b81;    --bad-rgb: 255, 107, 129;
 
   --node-bg: #151938;
   --node-bg-hover: #1e2350;
@@ -44,11 +44,11 @@
 
   --cur: #0794b8;   --cur-rgb: 7, 148, 184;
   --opt: #5a49d6;   --opt-rgb: 90, 73, 214;
-  --tgt: #e3226f;   --tgt-rgb: 227, 34, 111;
-  --start: #0f9a58; --start-rgb: 15, 154, 88;
+  --tgt: #0f9a58;   --tgt-rgb: 15, 154, 88;
+  --start: #e3226f; --start-rgb: 227, 34, 111;
   --good: #16a765;
   --warn: #c98a00;   --warn-rgb: 201, 138, 0;
-  --bad: #d92d4b;
+  --bad: #d92d4b;    --bad-rgb: 217, 45, 75;
 
   --node-bg: #ffffff;
   --node-bg-hover: #f1eeff;
@@ -391,10 +391,13 @@ main { flex: 1; display: flex; flex-direction: column; gap: 10px; min-height: 0;
 
 /* A brief colored flash on the word you just hopped to, echoing the hop sound's own closer/sideways/farther
    cue (the same trend value that drives the extra low undertone and the share screen's 🟩🟨🟥). Recolors the
-   whole node, not just its glow, so it reads clearly rather than blending into the node's usual cyan glow. */
-.node.current.trend-up { animation: trendFlash 1.4s var(--ease); --trend: var(--start); --trend-rgb: var(--start-rgb); }
-.node.current.trend-flat { animation: trendFlash 1.4s var(--ease); --trend: var(--warn); --trend-rgb: var(--warn-rgb); }
-.node.current.trend-down { animation: trendFlash 1.4s var(--ease); --trend: var(--tgt); --trend-rgb: var(--tgt-rgb); }
+   whole node, not just its glow, so it reads clearly rather than blending into the node's usual cyan glow.
+   Green matches the target's own color (closer = heading toward it), red matches the start's (farther = drifting
+   back toward where you began). One-shot and imperative (Stage.pulseTrend), separate from the persistent ring
+   tint below so a later re-render (e.g. a resize) can't accidentally replay it. */
+.node.current.flash-up { animation: trendFlash 1.4s var(--ease); --trend: var(--tgt); --trend-rgb: var(--tgt-rgb); }
+.node.current.flash-flat { animation: trendFlash 1.4s var(--ease); --trend: var(--warn); --trend-rgb: var(--warn-rgb); }
+.node.current.flash-down { animation: trendFlash 1.4s var(--ease); --trend: var(--start); --trend-rgb: var(--start-rgb); }
 @keyframes trendFlash {
   0%, 50% {
     background: linear-gradient(135deg, var(--trend), color-mix(in srgb, var(--trend) 55%, var(--opt)));
@@ -407,6 +410,12 @@ main { flex: 1; display: flex; flex-direction: column; gap: 10px; min-height: 0;
     box-shadow: 0 0 34px rgba(var(--cur-rgb), 0.6), 0 0 90px rgba(var(--cur-rgb), 0.28);
   }
 }
+
+/* The continual ring keeps echoing the most recent hop's trend until the next hop changes it (derived from
+   the game's own hop history in view(), so it survives re-renders rather than being wiped like the flash). */
+.node.current.trend-up::after { border-color: rgba(var(--tgt-rgb), 0.55); }
+.node.current.trend-flat::after { border-color: rgba(var(--warn-rgb), 0.55); }
+.node.current.trend-down::after { border-color: rgba(var(--start-rgb), 0.55); }
 
 .node.visited { opacity: 0.55; border-style: dashed; }
 .node.visited:hover { opacity: 0.9; }
@@ -680,7 +689,7 @@ dialog .row > * { flex: 1; }
 .cal .day.blank { border: 0; background: none; }
 .cal .day.today { border-color: var(--cur); box-shadow: 0 0 14px rgba(var(--cur-rgb), 0.3); }
 .cal .day.won { background: rgba(var(--cur-rgb), 0.16); }
-.cal .day.lost { background: rgba(var(--bad-rgb, 255, 107, 129), 0.14); }
+.cal .day.lost { background: rgba(var(--bad-rgb), 0.14); }
 .cal .day small { position: absolute; bottom: 3px; font-size: 9px; font-weight: 600; color: var(--muted); }
 
 /* settings */
@@ -823,8 +832,8 @@ dialog .row > * { flex: 1; }
   animation: breathe 1.6s ease-in-out infinite;
 }
 
-.hops.low { border-color: var(--tgt); box-shadow: 0 0 22px rgba(var(--tgt-rgb), 0.5), inset 0 0 14px rgba(var(--tgt-rgb), 0.15); animation: lowPulse 1s ease-in-out infinite; }
-.hops.low span { color: var(--tgt); }
+.hops.low { border-color: var(--bad); box-shadow: 0 0 22px rgba(var(--bad-rgb), 0.5), inset 0 0 14px rgba(var(--bad-rgb), 0.15); animation: lowPulse 1s ease-in-out infinite; }
+.hops.low span { color: var(--bad); }
 @keyframes lowPulse { 50% { transform: scale(1.07); } }
 .hops.low.bump { animation: bump 0.35s var(--ease), lowPulse 1s 0.35s ease-in-out infinite; }
 .min .sep { color: var(--faint); padding: 0 2px; }
