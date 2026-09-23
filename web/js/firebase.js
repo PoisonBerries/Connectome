@@ -16,9 +16,10 @@
 //     firstWord.K  wins whose first hop (the word right after the start) encodes to key K
 //     lastWord.K   wins whose last hop before the target encodes to key K
 //     (K = encodeURIComponent(word); a single word, not a whole path, is small enough to just show plainly)
-//   endlessRecord/global   one doc, the longest chain any player has ever reported: {links, hops, ts}. Number
-//     only, never a word chain — this is shown to every player, and unlike the rest of this file there is no
-//     private per-uid record backing it, so nothing here should ever be sensitive or offensive if faked.
+//   leaderboard/top10   one doc, the top 10 longest endless chains: {entries: [{initials, links, hops}, ...]},
+//     sorted descending by links. `initials` is exactly 3 [A-Z0-9] characters (arcade high-score style), checked
+//     against BANNED_INITIALS (web/js/initials.js, mirrored in firestore.rules) before ever being submitted.
+//     No uid, no free text — the only identity here is whatever 3 characters a player chose to type in.
 
 const SDK = 'https://www.gstatic.com/firebasejs/12.19.0';
 const HIST_CAP = 40;
@@ -185,33 +186,42 @@ export function percentileBetterThan(hist, score) {
   return Math.round((100 * worse) / total);
 }
 
-/** @returns {Promise<null|{links:number, hops:number}>} the global endless record, or {links:0,hops:0} if none set yet. */
-export async function fetchEndlessRecord() {
+/** @returns {Promise<null|object[]>} the top-10 list, sorted descending by links, or [] if empty/not set up yet. */
+export async function fetchLeaderboard() {
   try {
     const { fsMod, db } = await load();
-    const snap = await withTimeout(fsMod.getDoc(fsMod.doc(db, 'endlessRecord', 'global')));
-    if (!snap.exists()) return { links: 0, hops: 0 };
-    const d = snap.data();
-    return { links: d.links || 0, hops: d.hops || 0 };
+    const snap = await withTimeout(fsMod.getDoc(fsMod.doc(db, 'leaderboard', 'top10')));
+    const entries = snap.exists() ? snap.data().entries : [];
+    return Array.isArray(entries) ? entries : [];
   } catch (e) {
-    console.warn('[connectome] could not load the endless record:', e && e.message);
+    console.warn('[connectome] could not load the leaderboard:', e && e.message);
     return null;
   }
 }
 
 /**
- * Attempts to claim a new global endless record. Safe to call whenever a run ends with more links than the last
- * known record — the security rules, not this function, are what actually enforce "only if it's a real
- * improvement", so a rejected attempt here just means someone else's write already got there first, which is a
- * normal outcome, not an error.
- * @returns {Promise<boolean>} whether this write was actually accepted as the new record.
+ * Attempts to add {initials, links, hops} to the global top 10. Firestore has no atomic "insert into sorted
+ * array", so this re-fetches the current list and merges against *that* rather than trusting whatever the caller
+ * last saw — still not a transaction (see firestore.rules for what actually gets enforced either way), but it
+ * narrows the window. Safe to call any time a run ends with enough links to plausibly qualify; coming back null
+ * just means the list moved on since it was last checked, which is a normal outcome, not an error.
+ * @returns {Promise<null|{entries:object[], rank:number}>} the resulting list and this entry's 1-based rank,
+ *   or null if it didn't make the cut (or Firebase is unavailable).
  */
-export async function submitEndlessRecord(links, hops) {
+export async function submitToLeaderboard(initials, links, hops) {
   try {
     const { fsMod, db } = await load();
-    await withTimeout(fsMod.setDoc(fsMod.doc(db, 'endlessRecord', 'global'), { links, hops, ts: fsMod.serverTimestamp() }));
-    return true;
+    const ref = fsMod.doc(db, 'leaderboard', 'top10');
+    const before = await withTimeout(fsMod.getDoc(ref));
+    const current = before.exists() && Array.isArray(before.data().entries) ? before.data().entries : [];
+    const entry = { initials, links, hops };
+    const merged = [...current, entry].sort((a, b) => b.links - a.links).slice(0, 10);
+    const rank = merged.indexOf(entry) + 1;
+    if (!rank) return null; // sorted out of the top 10 by ties/newer entries between fetch and here
+    await withTimeout(fsMod.setDoc(ref, { entries: merged }));
+    return { entries: merged, rank };
   } catch (e) {
-    return false;
+    console.warn('[connectome] could not submit to the leaderboard:', e && e.message);
+    return null;
   }
 }

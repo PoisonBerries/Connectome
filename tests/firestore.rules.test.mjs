@@ -123,23 +123,34 @@ try {
   ok('reading the public aggregate requires only being signed in', await succeeds(getDoc(doc(alice.firestore(), stats(10)))));
   ok('reading the aggregate while signed out is refused', await fails(getDoc(doc(anon.firestore(), stats(10)))));
 
-  // ---- endlessRecord: a single global "longest chain" number, only ever movable upward
-  const record = doc(alice.firestore(), 'endlessRecord/global');
-  const goodRecord = (overrides = {}) => ({ links: 10, hops: 40, ts: serverTimestamp(), ...overrides });
+  // ---- leaderboard: the global top-10 longest chains, with 3-character arcade-style initials
+  const lb = doc(alice.firestore(), 'leaderboard/top10');
+  const lbAnon = doc(anon.firestore(), 'leaderboard/top10');
+  const lbBob = doc(bob.firestore(), 'leaderboard/top10');
+  const entry = (overrides = {}) => ({ initials: 'ABC', links: 10, hops: 40, ...overrides });
+  const list = (...entries) => ({ entries });
 
-  ok('signed-out cannot create the record', await fails(setDoc(doc(anon.firestore(), 'endlessRecord/global'), goodRecord())));
-  ok('links out of range is refused', await fails(setDoc(record, goodRecord({ links: 0 }))));
-  ok('links above the plausibility cap is refused', await fails(setDoc(record, goodRecord({ links: 501 }))));
-  ok('hops less than links is refused (can\'t chain N links in fewer than N hops)', await fails(setDoc(record, goodRecord({ links: 10, hops: 5 }))));
-  ok('a spoofed ts instead of serverTimestamp is refused', await fails(setDoc(record, goodRecord({ ts: new Date() }))));
-  ok('a signed-in user can set the first-ever record', await succeeds(setDoc(record, goodRecord())));
+  ok('signed-out cannot create the leaderboard', await fails(setDoc(lbAnon, list(entry()))));
+  ok('an empty list is refused', await fails(setDoc(lb, list())));
+  ok('more than 10 entries is refused', await fails(setDoc(lb, list(...Array.from({ length: 11 }, (_, i) => entry({ initials: 'A' + i, links: 20 - i }))))));
+  ok('initials must be exactly 3 characters', await fails(setDoc(lb, list(entry({ initials: 'AB' })))));
+  ok('lowercase initials are refused (must be A-Z0-9)', await fails(setDoc(lb, list(entry({ initials: 'abc' })))));
+  ok('initials with symbols are refused', await fails(setDoc(lb, list(entry({ initials: 'A-C' })))));
+  ok('a denylisted combo is refused even though it is a well-formed 3 characters', await fails(setDoc(lb, list(entry({ initials: 'ASS' })))));
+  ok('a digit-substituted denylisted combo is also refused', await fails(setDoc(lb, list(entry({ initials: 'A55' })))));
+  ok('links out of range is refused', await fails(setDoc(lb, list(entry({ links: 0 })))));
+  ok('links above the plausibility cap is refused', await fails(setDoc(lb, list(entry({ links: 501 })))));
+  ok('hops less than links is refused', await fails(setDoc(lb, list(entry({ links: 10, hops: 5 })))));
+  ok('an unsorted list (not descending by links) is refused', await fails(setDoc(lb, list(entry({ initials: 'AAA', links: 5 }), entry({ initials: 'BBB', links: 10 })))));
+  ok('a signed-in user can create the first-ever leaderboard', await succeeds(setDoc(lb, list(entry()))));
 
-  ok('an update that does not beat the current record is refused', await fails(setDoc(doc(bob.firestore(), 'endlessRecord/global'), goodRecord({ links: 10 }))));
-  ok('an update with fewer links than the current record is refused', await fails(setDoc(doc(bob.firestore(), 'endlessRecord/global'), goodRecord({ links: 4 }))));
-  ok('an update that genuinely beats the current record succeeds', await succeeds(setDoc(doc(bob.firestore(), 'endlessRecord/global'), goodRecord({ links: 11, hops: 44 }))));
-  ok('the record now reflects the higher value', (await getDoc(record)).data().links === 11);
-  ok('deleting the record is always refused', await fails(deleteDoc(record)));
-  ok('reading the record while signed out is refused', await fails(getDoc(doc(anon.firestore(), 'endlessRecord/global'))));
+  ok('an update that lowers the #1 score is refused', await fails(setDoc(lbBob, list(entry({ initials: 'ZZZ', links: 3, hops: 10 })))));
+  ok('an update that keeps #1 the same while adding a genuine second entry succeeds',
+    await succeeds(setDoc(lbBob, list(entry(), entry({ initials: 'ZZZ', links: 3, hops: 10 })))));
+  ok('an update that raises #1 succeeds', await succeeds(setDoc(lbBob, list(entry({ initials: 'WOW', links: 15, hops: 60 }), entry(), entry({ initials: 'ZZZ', links: 3, hops: 10 })))));
+  ok('the leaderboard now reflects the raised #1', (await getDoc(lb)).data().entries[0].links === 15);
+  ok('deleting the leaderboard is always refused', await fails(deleteDoc(lb)));
+  ok('reading the leaderboard while signed out is refused', await fails(getDoc(lbAnon)));
 
   console.log(`\n${n} checks run`);
 } finally {

@@ -58,6 +58,40 @@ service cloud.firestore {
       return exists(/databases/$(database)/documents/plays/$(puzzleId + '_' + request.auth.uid));
     }
 
+    // BANNED_INITIALS is a moderate, non-exhaustive denylist of common profanity/slurs (and obvious digit-for-
+    // letter substitutions) that fit in 3 characters - not a claim of completeness, and not meant to be the only
+    // check: web/js/initials.js has the identical list and is what the client checks before ever attempting a
+    // write. If one changes, update the other to match.
+    function isCleanInitials(s) {
+      return s is string && s.matches('^[A-Z0-9]{3}$') && !(s in [
+        'ASS', 'A55', '4SS', 'FAG', 'F4G', 'CUM', 'CVM', 'TIT', 'T1T', 'SOB',
+        'FUK', 'FCK', 'PHK', 'SHT', 'SH1', 'DIK', 'DIC', 'JIZ', 'CNT', 'KKK',
+        'NIG', 'N1G', 'SEX', 'S3X', 'HOE', 'H0E', 'SLT', 'PIS', 'PSS', 'TWA',
+        'COK', 'C0K', 'COC', 'BJS', 'PRK', 'RTA', 'FUC', 'WOP', 'GOK', 'SPC',
+        'KYK', 'CHK', 'NGR'
+      ]);
+    }
+    function validLbEntry(e) {
+      return e.initials is string && isCleanInitials(e.initials)
+        && e.links is int && e.links >= 1 && e.links <= 500
+        && e.hops is int && e.hops >= e.links && e.hops <= 6000;
+    }
+    // Both helpers treat "index doesn't exist in this list" as vacuously fine, so a shorter-than-10 list only
+    // ever gets checked at the indices it actually has.
+    function lbEntryOk(d, i) {
+      return d.entries.size() <= i || validLbEntry(d.entries[i]);
+    }
+    function lbSortedOk(d, i) {
+      return d.entries.size() <= i || d.entries[i - 1].links >= d.entries[i].links;
+    }
+    function isValidLeaderboard(d) {
+      return d.entries is list && d.entries.size() >= 1 && d.entries.size() <= 10
+        && lbEntryOk(d, 0) && lbEntryOk(d, 1) && lbEntryOk(d, 2) && lbEntryOk(d, 3) && lbEntryOk(d, 4)
+        && lbEntryOk(d, 5) && lbEntryOk(d, 6) && lbEntryOk(d, 7) && lbEntryOk(d, 8) && lbEntryOk(d, 9)
+        && lbSortedOk(d, 1) && lbSortedOk(d, 2) && lbSortedOk(d, 3) && lbSortedOk(d, 4) && lbSortedOk(d, 5)
+        && lbSortedOk(d, 6) && lbSortedOk(d, 7) && lbSortedOk(d, 8) && lbSortedOk(d, 9);
+    }
+
     // One immutable record per player per daily puzzle. The client never reads these back — the aggregate below
     // covers the UI — they exist so `hasPlayRecord` has something concrete to check, and so the raw data could be
     // recomputed or audited later if that's ever needed.
@@ -93,22 +127,23 @@ service cloud.firestore {
         && isPlausibleDelta(resource.data, request.resource.data);
     }
 
-    // The single global "longest chain" record for endless mode. A number, never a word chain — this is shown to
-    // every player with no per-uid record behind it, unlike everything else in this file, so there is nothing here
-    // that could ever be sensitive or offensive if faked. There is also no server verifying a chain was actually
-    // played (same accepted limitation as the rest of this file), but unlike an aggregate, a max is fully
-    // overwritten by one bad write rather than merely nudged, so it matters more here that an update can only ever
-    // move the record up, never down or sideways, and only within a bound no genuine run could plausibly clear.
-    match /endlessRecord/global {
+    // The global top-10 longest chains for endless mode, with 3-character arcade-style initials. A single fixed
+    // doc holding the whole sorted list, since Firestore has no atomic "insert into sorted array" primitive - the
+    // client reads, merges, re-sorts and writes the whole thing back. That (not an oversight) is why this can't be
+    // locked down as tightly as a single-value record: rules can validate that a submitted list is well-formed
+    // (at most 10 entries, each one in-bounds, descending by links, initials not on the denylist above), but not
+    // that it's *specifically* the previous list plus one genuine new entry - a determined tamperer could submit
+    // an entirely fabricated top-10 in one write, same "no server verifies a chain was actually played" limitation
+    // as the rest of this file, just with a larger blast radius per successful attempt than a single-value record
+    // would have. The one thing this can and does check: a write may never lower the current #1 score, so a bad or
+    // buggy write can't clobber good data with something worse.
+    match /leaderboard/top10 {
       allow read: if isSignedIn();
       allow delete: if false;
-      function isValidRecord(d) {
-        return d.links is int && d.links >= 1 && d.links <= 500
-          && d.hops is int && d.hops >= d.links && d.hops <= 6000
-          && d.ts == request.time;
-      }
-      allow create: if isSignedIn() && isValidRecord(request.resource.data);
-      allow update: if isSignedIn() && isValidRecord(request.resource.data) && request.resource.data.links > resource.data.links;
+      allow create: if isSignedIn() && isValidLeaderboard(request.resource.data);
+      allow update: if isSignedIn() && isValidLeaderboard(request.resource.data)
+        && (resource.data.entries.size() == 0
+              || request.resource.data.entries[0].links >= resource.data.entries[0].links);
     }
   }
 }

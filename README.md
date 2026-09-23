@@ -57,10 +57,11 @@ thing anyway). Rating tiers run from *Perfect wiring* (min) down to *Tangled*. T
 **Community stats:** once you finish a daily puzzle, the result screen shows how you compare — solve count, the
 average number of hops, the percentage of solvers you beat (wins only; a give-up doesn't get a percentile), and the
 most common first hop and the most common word right before the target (shown plainly, not behind a click — a single
-word each isn't much of a spoiler). Endless mode's results screen shows one more thing built on the same backend:
-"World", the longest chain any player has ever reported globally (a single number, never the actual chain of words —
-see [Community stats (optional)](#community-stats-optional) for why). This is entirely optional: the game works
-exactly the same without it, just without those numbers. See [Community stats (optional)](#community-stats-optional)
+word each isn't much of a spoiler). Endless mode's results screen shows two more things built on the same backend:
+"Community Best"/"Community Most Hops" (the #1 entry on the global top-10), and, if a run's link count makes that
+list, a prompt to enter 3 arcade-style initials (letters/numbers only, checked against a denylist both before
+submitting and again server-side) — "View top 10" opens the full ranked list. This is entirely optional: the game
+works exactly the same without it, just without those numbers. See [Community stats (optional)](#community-stats-optional)
 to turn it on.
 
 ## Community stats (optional)
@@ -100,14 +101,22 @@ and submitting one fabricated-but-plausible play. That's an accepted limitation 
 ever becomes a real problem, the fix is moving the aggregate update into a Cloud Function that checks the path against
 the actual graph before trusting it.
 
-The endless "World" record is the same limitation with a sharper edge: `puzzleStats` is an aggregate, where one bad
-write barely nudges an average, but a record is a max — one fabricated submission overwrites it outright, and it
-stays overwritten (visible to everyone) until someone fakes a bigger one. The rules narrow this as much as they
-reasonably can without a Cloud Function (an update must strictly beat the current value, and both `links` and `hops`
-are capped well beyond anything a genuine run could plausibly reach), but they can't verify a chain was actually
-played, same as everywhere else in this file. That tradeoff is why the record shows only a number, never the actual
-chain of words — the existing per-player data here is already private (`plays` docs are `allow read: if false`); a
-public leaderboard of unverified, player-submitted word sequences would be a new and different kind of exposure.
+The endless leaderboard is the same limitation with a sharper edge, twice over. First: `puzzleStats` is an
+aggregate, where one bad write barely nudges an average, but the leaderboard's #1 entry is a max — one fabricated
+submission overwrites it outright, and it stays overwritten (visible to everyone) until someone fakes a bigger one.
+Second: Firestore has no atomic "insert into a sorted array" primitive, so the whole top-10 list lives in one doc
+that the client reads, merges a new entry into, and writes back whole — meaning the rules can validate that a
+*submitted list* is well-formed (at most 10 entries, each in-bounds, descending by links, initials not on the
+denylist, `#1` never moving backward), but not that it's *specifically* the previous list plus one genuine new
+entry. A determined tamperer could submit an entirely fabricated top-10 in one write; same "no server verifies a
+chain was actually played" limitation as everywhere else in this file, just a larger blast radius per attempt.
+
+That's also why entries are 3-character arcade-style initials (`[A-Z0-9]{3}`, checked against a denylist in both
+`web/js/initials.js` and mirrored in the rules) rather than free-text names or the actual chain of words — the
+existing per-player data here is already private (`plays` docs are `allow read: if false`); a public leaderboard of
+unverified, player-submitted content would be a new and different kind of exposure, and restricting the alphabet to
+3 characters is what makes a profanity denylist tractable at all (a moderate, non-exhaustive list is enough to
+catch most of a small, enumerable space — it would not be for free-text names).
 
 **Testing the rules:** `tests/firestore.rules.test.mjs` exercises `firestore.rules` against a local emulator (not
 your real project — no credentials touched), and runs as its own check in CI (`.github/workflows/pages.yml`) on every

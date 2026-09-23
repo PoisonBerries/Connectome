@@ -629,6 +629,55 @@ dialog .row > * { flex: 1; }
   white-space: nowrap;
 }
 
+/* the arcade-style 3-character initials prompt shown when a run's link count makes the global top 10 */
+.qualify {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(var(--warn-rgb), 0.08);
+  border: 1px dashed rgba(var(--warn-rgb), 0.5);
+  text-align: center;
+}
+.qualify .lede { margin: 0; font-size: 13px; }
+.qualify .row { justify-content: center; }
+.qualify input {
+  width: 84px;
+  padding: 10px 0;
+  border-radius: 12px;
+  border: 1.5px solid var(--border-2);
+  background: var(--panel-2);
+  color: var(--ink);
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 0.3em;
+  text-align: center;
+  text-transform: uppercase;
+}
+.qualify input:focus-visible { outline: 2px solid var(--cur); outline-offset: 2px; }
+.qualify .err { color: var(--bad); font-size: 12.5px; min-height: 15px; }
+.qualify .done { font-size: 15px; font-weight: 700; color: var(--warn); }
+
+.lb-list { display: grid; gap: 6px; margin-top: 14px; max-height: 50vh; overflow-y: auto; }
+.lb-row {
+  display: grid;
+  grid-template-columns: 24px 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+.lb-row .rank { font-weight: 800; color: var(--muted); font-variant-numeric: tabular-nums; }
+.lb-row:first-child .rank { color: var(--warn); }
+.lb-row .initials { font-weight: 800; letter-spacing: 0.12em; font-size: 16px; }
+.lb-row .links { font-weight: 700; font-variant-numeric: tabular-nums; }
+.lb-row .hops { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.lb-empty { text-align: center; color: var(--muted); padding: 20px; }
+
 .dist { display: grid; gap: 6px; }
 .dist .bar { display: grid; grid-template-columns: 112px 1fr; gap: 10px; align-items: center; font-size: 13px; color: var(--muted); }
 .dist .fill {

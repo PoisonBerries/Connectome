@@ -287,6 +287,8 @@
           <p class="lede" id="eo-sub"></p>
         </div>
         <div class="res-stats" id="eo-stats"></div>
+        <div class="qualify" id="eo-qualify" hidden></div>
+        <button class="btn wide" id="eo-leaderboard" type="button" hidden>🏆 View top 10</button>
         <div class="chain" id="eo-chain" aria-label="Your chain"></div>
       </div>
       <div class="res-col">
@@ -306,6 +308,14 @@
         <button class="btn wide" id="eo-daily" style="margin-top:10px">Back to the daily</button>
       </div>
     </div>
+  </dialog>
+
+  <!-- Endless top-10 leaderboard -->
+  <dialog id="dlg-leaderboard" class="sheet" aria-labelledby="lb-title">
+    <form method="dialog" class="dlg-close"><button class="icon-btn" data-icon="close" aria-label="Close"></button></form>
+    <h2 id="lb-title">Top 10 chains</h2>
+    <p class="lede">The longest endless chains reported by any player, worldwide.</p>
+    <div class="lb-list" id="lb-list"></div>
   </dialog>
 
   <div class="toasts" id="toasts" aria-live="polite"></div>

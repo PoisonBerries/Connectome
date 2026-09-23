@@ -8,7 +8,8 @@ import { sound, haptic } from './sound.js';
 import { settings as settingsStore, saves, stats as statsStore, endless as endlessStore, TIERS, tierIndex } from './store.js';
 import { EndlessRun, minForRound } from './endless.js';
 import { hydrateIcons } from './icons.js';
-import { submitDailyResult, fetchDailyStats, percentileBetterThan, fetchEndlessRecord, submitEndlessRecord } from './firebase.js';
+import { submitDailyResult, fetchDailyStats, percentileBetterThan, fetchLeaderboard, submitToLeaderboard } from './firebase.js';
+import { isCleanInitials } from './initials.js';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -559,7 +560,11 @@ function openEndlessOver() {
       ? `You chained ${run.links} ${run.links === 1 ? 'link' : 'links'}.`
       : `You chained ${run.links} ${run.links === 1 ? 'link' : 'links'}, then ran out of moves reaching ${w[run.missed]}.`;
   $('eo-stats').innerHTML =
-    statBox('Links', run.links) + statBox('Hops', run.totalHops) + statBox('Your Best', stats.best, newBest && run.links > 0);
+    statBox('Links', run.links) + statBox('Hops', run.totalHops) + statBox('Your Best', stats.best, newBest && run.links > 0) +
+    '<div id="eo-community" style="display:contents"></div>';
+  $('eo-leaderboard').hidden = true;
+  $('eo-qualify').hidden = true;
+  $('eo-qualify').innerHTML = '';
   $('eo-chain').innerHTML =
     run.chain.map((id, i) => `<span class="chip${i === 0 ? ' first' : ''}">${esc(w[id])}</span>`).join('<span class="arr">→</span>') +
     (run.missed != null ? `<span class="arr">→</span><span class="chip miss">${esc(w[run.missed])}</span>` : '');
@@ -581,31 +586,82 @@ function openEndlessOver() {
   openDialog('dlg-endless-over');
   state.map?.stop();
   requestAnimationFrame(() => (state.map = drawConstellation($('eo-canvas'), world, run.game, { animate: state.settings.motion })));
-  loadEndlessRecord(run); // fire-and-forget: the global record is optional flavor, never holds up the results screen
+  loadLeaderboard(run); // fire-and-forget: the leaderboard is optional flavor, never holds up the results screen
 }
 
-/** The global longest-chain record across every player, added to the results stats once fetched; claims a new
- * record if this run just beat it. Silently does nothing if Firebase is unavailable, same as daily's community stats. */
-async function loadEndlessRecord(run) {
-  let record = await fetchEndlessRecord();
+/**
+ * The global top-10 chains, added to the results stats once fetched. If this run's links qualify, shows an
+ * inline 3-character initials prompt (arcade high-score style); a successful submission updates the stats/tags
+ * and the "View top 10" dialog. Silently does nothing if Firebase is unavailable, same as daily's community stats.
+ */
+async function loadLeaderboard(run) {
+  let entries = await fetchLeaderboard();
   if (state.run !== run || !$('dlg-endless-over').open) return; // the screen moved on while this was in flight
-  let worldNew = false;
-  if (record && run.links > record.links) {
-    const claimed = await submitEndlessRecord(run.links, run.totalHops);
-    if (state.run !== run || !$('dlg-endless-over').open) return;
-    if (claimed) {
-      record = { links: run.links, hops: run.totalHops };
-      worldNew = true;
-    } else {
-      record = await fetchEndlessRecord(); // someone else's write beat ours in the meantime; show the real value
-      if (state.run !== run || !$('dlg-endless-over').open) return;
+  if (entries === null) return; // unavailable (offline, blocked, not configured) — stay silent
+
+  renderCommunityStats(entries, false);
+  $('eo-leaderboard').hidden = false;
+  $('eo-leaderboard').onclick = () => openLeaderboardDialog(entries);
+
+  const qualifies = run.links > 0 && (entries.length < 10 || run.links > entries[entries.length - 1].links);
+  if (!qualifies) return;
+
+  $('eo-qualify').hidden = false;
+  $('eo-qualify').innerHTML = `
+    <p class="lede">You made the global top 10! Enter 3 letters or numbers:</p>
+    <div class="row">
+      <input id="eo-initials" maxlength="3" autocomplete="off" autocapitalize="characters" aria-label="Your initials" />
+      <button class="btn primary sm" id="eo-initials-go" type="button">Submit</button>
+    </div>
+    <p class="err" id="eo-initials-err"></p>`;
+  const input = $('eo-initials');
+  input.addEventListener('input', () => (input.value = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '')));
+  input.addEventListener('keydown', (e) => e.key === 'Enter' && submitInitials());
+  $('eo-initials-go').onclick = submitInitials;
+  input.focus();
+
+  async function submitInitials() {
+    const initials = input.value;
+    if (!isCleanInitials(initials)) {
+      $('eo-initials-err').textContent = initials.length !== 3 ? 'Enter exactly 3 letters or numbers.' : 'Try different initials.';
+      return;
     }
+    $('eo-initials-go').disabled = true;
+    input.disabled = true;
+    const result = await submitToLeaderboard(initials, run.links, run.totalHops);
+    if (state.run !== run || !$('dlg-endless-over').open) return;
+    if (!result) {
+      $('eo-qualify').innerHTML = '<p class="lede">Someone else just took that spot — so close!</p>';
+      return;
+    }
+    entries = result.entries;
+    $('eo-qualify').innerHTML = `<p class="done">🏆 You're #${result.rank} on the global leaderboard!</p>`;
+    renderCommunityStats(entries, result.rank === 1);
   }
-  if (!record) return;
-  $('eo-stats').insertAdjacentHTML(
-    'beforeend',
-    statBox('Community Best', record.links, worldNew) + statBox('Community Most Hops', record.hops, worldNew)
-  );
+}
+
+/** (Re-)renders the Community Best / Community Most Hops stats from a fetched or just-updated top-10 list. */
+function renderCommunityStats(entries, worldNew) {
+  const top = entries[0];
+  $('eo-community').innerHTML = top
+    ? statBox('Community Best', top.links, worldNew) + statBox('Community Most Hops', top.hops, worldNew)
+    : statBox('Community Best', '—') + statBox('Community Most Hops', '—');
+}
+
+function openLeaderboardDialog(entries) {
+  $('lb-list').innerHTML = entries.length
+    ? entries
+        .map(
+          (e, i) => `<div class="lb-row">
+            <span class="rank">${i + 1}</span>
+            <span class="initials">${esc(e.initials)}</span>
+            <span class="links">${e.links} ${e.links === 1 ? 'link' : 'links'}</span>
+            <span class="hops">${e.hops} hops</span>
+          </div>`
+        )
+        .join('')
+    : '<p class="lb-empty">No one has chained a link yet — be the first!</p>';
+  openDialog('dlg-leaderboard');
 }
 
 // ------------------------------------------------------------------ dialogs
