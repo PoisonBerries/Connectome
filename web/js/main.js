@@ -635,7 +635,7 @@ async function loadLeaderboard(run) {
       return;
     }
     entries = result.entries;
-    $('eo-qualify').innerHTML = `<p class="done">🏆 You're #${result.rank} on the global leaderboard!</p>`;
+    $('eo-qualify').innerHTML = `<p class="done">You're #${result.rank} on the global leaderboard!</p>`;
     renderCommunityStats(entries, result.rank === 1);
   }
 }
@@ -656,7 +656,7 @@ function openLeaderboardDialog(entries) {
             <span class="rank">${i + 1}</span>
             <span class="initials">${esc(e.initials)}</span>
             <span class="links">${e.links} ${e.links === 1 ? 'link' : 'links'}</span>
-            <span class="hops">${e.hops} hops</span>
+            <span class="lb-hops">${e.hops} hops</span>
           </div>`
         )
         .join('')

@@ -675,7 +675,15 @@ dialog .row > * { flex: 1; }
 .lb-row:first-child .rank { color: var(--warn); }
 .lb-row .initials { font-weight: 800; letter-spacing: 0.12em; font-size: 16px; }
 .lb-row .links { font-weight: 700; font-variant-numeric: tabular-nums; }
-.lb-row .hops { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.lb-row .lb-hops {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(var(--cur-rgb), 0.55);
+  font-size: 12px;
+  white-space: nowrap;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
 .lb-empty { text-align: center; color: var(--muted); padding: 20px; }
 
 .dist { display: grid; gap: 6px; }
