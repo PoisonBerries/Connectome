@@ -13,8 +13,26 @@ function ensure() {
       return null;
     }
   }
-  if (ctx.state === 'suspended') ctx.resume();
+  if (ctx.state === 'suspended') ctx.resume().catch(() => {});
   return ctx;
+}
+
+// Leaving the tab (or backgrounding the app) can leave the AudioContext permanently suspended - or, on iOS in
+// particular, silently dead even though .resume() resolves and it still reports 'running'. Resuming in place
+// isn't reliably enough to recover from that, so on return, throw the old context away and let the next sound
+// lazily build a fresh one instead.
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && ctx) {
+      const stale = ctx;
+      ctx = null;
+      try {
+        stale.close();
+      } catch {
+        /* already unusable, nothing to clean up */
+      }
+    }
+  });
 }
 
 function tone(freq, start, dur, { type = 'sine', gain = 0.07, glide = 0 } = {}) {
