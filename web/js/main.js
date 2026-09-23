@@ -603,7 +603,9 @@ async function loadLeaderboard(run) {
   $('eo-leaderboard').hidden = false;
   $('eo-leaderboard').onclick = () => openLeaderboardDialog(entries);
 
-  const qualifies = run.links > 0 && (entries.length < 10 || run.links > entries[entries.length - 1].links);
+  // run.lbSubmitted guards against re-submitting the same run: openEndlessOver() (and thus this function) can run
+  // again for the same run object, e.g. if the player reopens the results screen via the "results" button.
+  const qualifies = !run.lbSubmitted && run.links > 0 && (entries.length < 10 || run.links > entries[entries.length - 1].links);
   if (!qualifies) return;
 
   $('eo-qualify').hidden = false;
@@ -634,6 +636,7 @@ async function loadLeaderboard(run) {
       $('eo-qualify').innerHTML = '<p class="lede">Someone else just took that spot — so close!</p>';
       return;
     }
+    run.lbSubmitted = true;
     entries = result.entries;
     $('eo-qualify').innerHTML = `<p class="done">You're #${result.rank} on the global leaderboard!</p>`;
     renderCommunityStats(entries, result.rank === 1);

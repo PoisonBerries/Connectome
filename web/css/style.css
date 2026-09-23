@@ -676,11 +676,13 @@ dialog .row > * { flex: 1; }
 .lb-row .initials { font-weight: 800; letter-spacing: 0.12em; font-size: 16px; }
 .lb-row .links { font-weight: 700; font-variant-numeric: tabular-nums; }
 .lb-row .lb-hops {
+  justify-self: end;
   padding: 4px 10px;
   border-radius: 999px;
   border: 1.5px solid rgba(var(--cur-rgb), 0.55);
   font-size: 12px;
   white-space: nowrap;
+  text-align: center;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
