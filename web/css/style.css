@@ -389,15 +389,23 @@ main { flex: 1; display: flex; flex-direction: column; gap: 10px; min-height: 0;
 }
 @keyframes ring { from { transform: scale(0.94); opacity: 0.9; } to { transform: scale(1.22); opacity: 0; } }
 
-/* A brief colored pulse on the word you just hopped to, echoing the hop sound's own closer/sideways/farther
-   cue (the same trend value that drives the extra low undertone and the share screen's 🟩🟨🟥). */
-.node.current.trend-up { animation: trendPulse 0.7s var(--ease); --trend-rgb: var(--start-rgb); }
-.node.current.trend-flat { animation: trendPulse 0.7s var(--ease); --trend-rgb: var(--warn-rgb); }
-.node.current.trend-down { animation: trendPulse 0.7s var(--ease); --trend-rgb: var(--tgt-rgb); }
-@keyframes trendPulse {
-  0% { box-shadow: 0 0 0 0 rgba(var(--trend-rgb), 0.95), 0 0 34px rgba(var(--cur-rgb), 0.6), 0 0 90px rgba(var(--cur-rgb), 0.28); }
-  65% { box-shadow: 0 0 0 18px rgba(var(--trend-rgb), 0), 0 0 34px rgba(var(--cur-rgb), 0.6), 0 0 90px rgba(var(--cur-rgb), 0.28); }
-  100% { box-shadow: 0 0 34px rgba(var(--cur-rgb), 0.6), 0 0 90px rgba(var(--cur-rgb), 0.28); }
+/* A brief colored flash on the word you just hopped to, echoing the hop sound's own closer/sideways/farther
+   cue (the same trend value that drives the extra low undertone and the share screen's 🟩🟨🟥). Recolors the
+   whole node, not just its glow, so it reads clearly rather than blending into the node's usual cyan glow. */
+.node.current.trend-up { animation: trendFlash 0.9s var(--ease); --trend: var(--start); --trend-rgb: var(--start-rgb); }
+.node.current.trend-flat { animation: trendFlash 0.9s var(--ease); --trend: var(--warn); --trend-rgb: var(--warn-rgb); }
+.node.current.trend-down { animation: trendFlash 0.9s var(--ease); --trend: var(--tgt); --trend-rgb: var(--tgt-rgb); }
+@keyframes trendFlash {
+  0%, 30% {
+    background: linear-gradient(135deg, var(--trend), color-mix(in srgb, var(--trend) 55%, var(--opt)));
+    border-color: var(--trend);
+    box-shadow: 0 0 0 7px rgba(var(--trend-rgb), 0.45), 0 0 50px rgba(var(--trend-rgb), 0.95), 0 0 120px rgba(var(--trend-rgb), 0.55);
+  }
+  100% {
+    background: linear-gradient(135deg, var(--cur), color-mix(in srgb, var(--cur) 55%, var(--opt)));
+    border-color: var(--cur);
+    box-shadow: 0 0 34px rgba(var(--cur-rgb), 0.6), 0 0 90px rgba(var(--cur-rgb), 0.28);
+  }
 }
 
 .node.visited { opacity: 0.55; border-style: dashed; }
