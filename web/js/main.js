@@ -138,7 +138,7 @@ function paintMission() {
   $('to-sub').textContent = p.targetLabel || '';
   $('min-line').innerHTML =
     state.mode === 'endless'
-      ? `of <b id="min-count">${state.run.budget}</b>${state.run.carry > 0 ? `<span class="carry-note">+${state.run.carry} carried</span>` : ''}<span class="sep">·</span>min ${p.min}`
+      ? `of <b id="min-count">${state.run.budget}</b><span class="sep">·</span>min ${p.min}${state.run.carry > 0 ? `<span class="carry-note">+${state.run.carry} carried</span>` : ''}`
       : `min <b id="min-count">${p.min}</b>`;
   $('gateways').hidden = !g.gatewaysShown;
   if (g.gatewaysShown) fillGateways();

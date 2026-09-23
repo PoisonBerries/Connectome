@@ -837,7 +837,7 @@ dialog .row > * { flex: 1; }
 @keyframes lowPulse { 50% { transform: scale(1.07); } }
 .hops.low.bump { animation: bump 0.35s var(--ease), lowPulse 1s 0.35s ease-in-out infinite; }
 .min .sep { color: var(--faint); padding: 0 2px; }
-.carry-note { color: var(--cur); font-weight: 700; margin-left: 3px; }
+.carry-note { display: block; color: var(--cur); font-weight: 700; font-size: 10px; }
 
 .inf { color: var(--cur); }
 .endless-cta { width: 100%; margin-top: 14px; border-color: rgba(var(--cur-rgb), 0.45); }
