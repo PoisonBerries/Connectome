@@ -244,6 +244,10 @@ function fillGateways() {
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
+/** A stat box for a results screen, with an optional "New!" corner ribbon when `isNew` is truthy. */
+const statBox = (label, value, isNew = false) =>
+  `<div class="stat">${isNew ? '<span class="corner-tag">New!</span>' : ''}<b>${value}</b><small>${label}</small></div>`;
+
 // ------------------------------------------------------------------ actions
 
 function persist() {
@@ -554,8 +558,8 @@ function openEndlessOver() {
     run.reason === 'quit'
       ? `You chained ${run.links} ${run.links === 1 ? 'link' : 'links'}.`
       : `You chained ${run.links} ${run.links === 1 ? 'link' : 'links'}, then ran out of moves reaching ${w[run.missed]}.`;
-  $('eo-stats').innerHTML = [['Links', run.links], ['Best', stats.best], ['Hops', run.totalHops]]
-    .map(([l, v]) => `<div class="stat"><b>${v}</b><small>${l}</small></div>`).join('');
+  $('eo-stats').innerHTML =
+    statBox('Links', run.links) + statBox('Hops', run.totalHops) + statBox('Your Best', stats.best, newBest && run.links > 0);
   $('eo-chain').innerHTML =
     run.chain.map((id, i) => `<span class="chip${i === 0 ? ' first' : ''}">${esc(w[id])}</span>`).join('<span class="arr">→</span>') +
     (run.missed != null ? `<span class="arr">→</span><span class="chip miss">${esc(w[run.missed])}</span>` : '');
@@ -585,14 +589,23 @@ function openEndlessOver() {
 async function loadEndlessRecord(run) {
   let record = await fetchEndlessRecord();
   if (state.run !== run || !$('dlg-endless-over').open) return; // the screen moved on while this was in flight
+  let worldNew = false;
   if (record && run.links > record.links) {
     const claimed = await submitEndlessRecord(run.links, run.totalHops);
     if (state.run !== run || !$('dlg-endless-over').open) return;
-    record = claimed ? { links: run.links, hops: run.totalHops } : await fetchEndlessRecord();
-    if (state.run !== run || !$('dlg-endless-over').open) return;
+    if (claimed) {
+      record = { links: run.links, hops: run.totalHops };
+      worldNew = true;
+    } else {
+      record = await fetchEndlessRecord(); // someone else's write beat ours in the meantime; show the real value
+      if (state.run !== run || !$('dlg-endless-over').open) return;
+    }
   }
   if (!record) return;
-  $('eo-stats').insertAdjacentHTML('beforeend', `<div class="stat"><b>${record.links}</b><small>World</small></div>`);
+  $('eo-stats').insertAdjacentHTML(
+    'beforeend',
+    statBox('Community Best', record.links, worldNew) + statBox('Community Most Hops', record.hops, worldNew)
+  );
 }
 
 // ------------------------------------------------------------------ dialogs
