@@ -259,10 +259,12 @@ function pick(id) {
   persist();
 
   const progress = g.puzzle.min ? clamp(1 - g.dist[id] / Math.max(1, g.dist[g.puzzle.start]), 0, 1) : 0;
-  sound.hop(progress, Math.sign(rec.before - rec.after));
+  const trend = Math.sign(rec.before - rec.after);
+  sound.hop(progress, trend);
   haptic(8);
 
   render();
+  state.stage.pulseTrend(trend);
   if (state.mode === 'endless') {
     if (res.won) roundWon();
     else if (res.lost) runOver();

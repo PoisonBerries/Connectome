@@ -216,6 +216,15 @@ export class Stage {
     return this.nodes.get(id);
   }
 
+  /** Flashes the current word with the hop's trend: 1 closer (green), 0 sideways (yellow), -1 farther (red). */
+  pulseTrend(trend) {
+    const el = this.nodes.get(this.view?.current);
+    if (!el) return;
+    el.classList.remove('trend-up', 'trend-flat', 'trend-down');
+    void el.offsetWidth;
+    el.classList.add(trend > 0 ? 'trend-up' : trend < 0 ? 'trend-down' : 'trend-flat');
+  }
+
   shake(id) {
     const el = this.nodes.get(id);
     if (!el) return;

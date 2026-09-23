@@ -19,7 +19,7 @@
   --tgt: #ff5fa2;   --tgt-rgb: 255, 95, 162;
   --start: #7dffb5; --start-rgb: 125, 255, 181;
   --good: #46e39a;
-  --warn: #ffd166;
+  --warn: #ffd166;   --warn-rgb: 255, 209, 102;
   --bad: #ff6b81;
 
   --node-bg: #151938;
@@ -47,7 +47,7 @@
   --tgt: #e3226f;   --tgt-rgb: 227, 34, 111;
   --start: #0f9a58; --start-rgb: 15, 154, 88;
   --good: #16a765;
-  --warn: #c98a00;
+  --warn: #c98a00;   --warn-rgb: 201, 138, 0;
   --bad: #d92d4b;
 
   --node-bg: #ffffff;
@@ -388,6 +388,17 @@ main { flex: 1; display: flex; flex-direction: column; gap: 10px; min-height: 0;
   animation: ring 2.6s ease-out infinite;
 }
 @keyframes ring { from { transform: scale(0.94); opacity: 0.9; } to { transform: scale(1.22); opacity: 0; } }
+
+/* A brief colored pulse on the word you just hopped to, echoing the hop sound's own closer/sideways/farther
+   cue (the same trend value that drives the extra low undertone and the share screen's 🟩🟨🟥). */
+.node.current.trend-up { animation: trendPulse 0.7s var(--ease); --trend-rgb: var(--start-rgb); }
+.node.current.trend-flat { animation: trendPulse 0.7s var(--ease); --trend-rgb: var(--warn-rgb); }
+.node.current.trend-down { animation: trendPulse 0.7s var(--ease); --trend-rgb: var(--tgt-rgb); }
+@keyframes trendPulse {
+  0% { box-shadow: 0 0 0 0 rgba(var(--trend-rgb), 0.95), 0 0 34px rgba(var(--cur-rgb), 0.6), 0 0 90px rgba(var(--cur-rgb), 0.28); }
+  65% { box-shadow: 0 0 0 18px rgba(var(--trend-rgb), 0), 0 0 34px rgba(var(--cur-rgb), 0.6), 0 0 90px rgba(var(--cur-rgb), 0.28); }
+  100% { box-shadow: 0 0 34px rgba(var(--cur-rgb), 0.6), 0 0 90px rgba(var(--cur-rgb), 0.28); }
+}
 
 .node.visited { opacity: 0.55; border-style: dashed; }
 .node.visited:hover { opacity: 0.9; }
