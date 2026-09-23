@@ -127,7 +127,14 @@ player: versus plain top-five, this cut tight cliques from 13% to 1.5% and raise
 Each endpoint also gets an *approachability* score (how often a simple navigator reaches it) so endless mode avoids
 near-unreachable targets. Inflections and obvious relatives (dog/dogs, photo/photograph)
 are never offered as neighbours. Proper nouns come from a hand-curated list (`proper_nouns.txt`) rather than the
-news-heavy raw corpus, and profanity, slurs, and graphic-violence terms are excluded (`lexicon.py`).
+news-heavy raw corpus, and profanity, slurs, and graphic-violence terms are excluded (`lexicon.py`). The automatic
+common-word pass is heavily biased toward nouns (WordNet gives every noun a hypernym chain up to a concrete
+category like animal/food/vehicle to check *picturability*; adjectives and verbs have no such structure to check
+against, so the ones that clear the bar tend to be the highest-frequency ones - "important", "believe" - not
+vivid ones like "gallop" or "fluffy"). `proper_nouns.txt`'s `adjectives`/`verbs` sections hand-add a vetted set of
+picturable ones instead, each checked against what it would actually link to before inclusion (most candidates
+that sound picturable turn out contaminated by an unrelated dominant sense the same way Bosch/myrtle were - "hop"
+pulled in hip-hop, "tumble" pulled in tumble-dry, "hover"/"blink" pulled in UI terminology - and were left out).
 A raw GloVe vector blends *every* sense of a surface form by how often each occurs in Common Crawl text, so a
 minority sense (Bosch the painter, myrtle the plant) can lose out to a majority one (Bosch the auto-parts/appliance
 brand, "Myrtle Beach") and pull in nonsense neighbours (Roomba, a grinder; sandcastle, resort). `--anchor` corrects

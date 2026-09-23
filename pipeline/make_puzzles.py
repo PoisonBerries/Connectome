@@ -35,6 +35,7 @@ LABELS = {
     "history_people": "historical figure", "arts_people": "artist or athlete", "fiction": "pop culture",
     "mythology": "myth & legend", "space": "space", "brands": "brand", "culture_misc": "culture",
     "landmarks": "landmark", "common_phrases": "everyday phrase", "foods": "food", "creatures": "animal", "games": "game", "everyday": "thing",
+    "adjectives": "descriptive word", "verbs": "action",
 }
 
 def label(i):

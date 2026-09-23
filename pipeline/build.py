@@ -101,7 +101,7 @@ else:
     V_low = transform(low_n)
     V_cap = transform(cap_n)
 
-LOWER_SECTIONS = {"common_phrases", "foods", "creatures", "everyday"}  # curated words that are ordinary lowercase words
+LOWER_SECTIONS = {"common_phrases", "foods", "creatures", "everyday", "adjectives", "verbs"}  # curated words that are ordinary lowercase words
 
 
 def get_vec(tok, proper):

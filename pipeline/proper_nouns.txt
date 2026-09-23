@@ -70,3 +70,9 @@ Kwanzaa, Passover, Lent, Coachella, Glastonbury, Burning Man=burning+man, Mardi 
 
 ## everyday
 accordion, binoculars, bulldozer, carnival, donkey, flamingo, jukebox, llama, lollipop, opera, seahorse, skateboard, snowman, sushi, trampoline, microwave, toaster, blender, backpack, surfboard, kayak, canoe, hammock, thermometer, stethoscope, stopwatch, calculator, typewriter, gramophone, harmonica, ukulele, banjo, tambourine, xylophone, trombone, clarinet, oboe, tuba, bagpipes, harpsichord, sailboat, gondola, rickshaw, tram, limousine, forklift, unicycle, tricycle, snowmobile, hovercraft, zeppelin, blimp, glider, spaceship, teapot, thermos, blanket, pillow, mattress, faucet, chandelier, doorbell, bookshelf, briefcase, wheelbarrow, lawnmower, scarecrow, snowflake, icicle, campfire, bonfire, sandcastle, seashell, starfish, driftwood, quicksand, avalanche, geyser, stalactite, boomerang, kite, confetti, carousel, igloo, teepee, gazebo, treehouse, compass, hourglass, sundial, scarf, mittens, sombrero, tuxedo, crown, monocle, top hat=top+hat, cowboy hat=cowboy+hat, bow tie=bow+tie, lifeguard, scuba, snorkel, harpoon, anchor, parachute, jetpack, skateboard, roller skates=roller+skates, ice skates=ice+skates, bowling, archery, fencing, gymnastics, marathon, surfing, skiing, sledding, hiking, camping, fishing, gardening, knitting, painting, sculpture, pottery, calligraphy, karaoke, magic trick=magic+trick, puppet, marionette, mannequin, scarecrow, gargoyle, obelisk, aqueduct, catapult, guillotine, drawbridge, dungeon, throne, scepter, chalice, goblet, tapestry, armor, helmet, shield, trebuchet
+
+## adjectives
+gigantic, colossal, crimson, magenta, prickly, fluffy, microscopic, frosty, crunchy, icy, speckled, checkered, woolly, jagged, misty, wobbly, sticky
+
+## verbs
+erupt, gallop, trot, waddle, shatter, flutter, prowl, crawl, soar, dissolve, sizzle, pounce, simmer, crumble, howl, plunge, wobble, glide
