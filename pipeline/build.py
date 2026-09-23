@@ -152,47 +152,6 @@ for disp, toks, section in curated:
                                section=section))
 print(f"curated: {len(nodes)} usable, {len(missing)} missing tokens -> {missing[:60]}")
 
-# ---------------------------------------------------------------- anchor outlier curated vectors to their section
-# GloVe vectors are per surface-form and blend every sense of a token by how often each occurs in raw text. A
-# curated proper noun's *intended* sense (Bosch the painter, not the auto-parts/appliance brand; Slinky the toy,
-# not the adjective) can be a minority use, so the vector still swims toward whatever sense dominates in Common
-# Crawl, which shows up as neighbours from a totally different world (Bosch <-> Roomba, Fitbit <-> Slinky).
-#
-# Most curated words are *not* like this - their raw vector already sits comfortably among their own curated
-# section (Kraken's vector is already core "mythical sea monster", which is exactly why it earns a genuinely
-# good bridge to Blackbeard). Pulling every word toward its section centroid indiscriminately was tried first and
-# measurably hurt overall navigability (evaluate.py's simulated-player solve rate dropped 10-25 points) by also
-# dragging well-placed words away from the legitimate cross-topic bridges they'd already found.
-#
-# So only outliers get corrected: for each section, find where a word's raw cosine similarity to its own
-# section centroid falls versus its section-mates (10th vs 60th percentile), and pull only the words below that
-# range - the ones a reader would call mislabeled - leaving everything already well-aligned untouched.
-if args.anchor:
-    from collections import defaultdict
-    by_section = defaultdict(list)
-    for k, node in nodes.items():
-        if node["kind"] != 0:
-            by_section[node["section"]].append(k)
-    centroid, lo_hi = {}, {}
-    for sec, ks in by_section.items():
-        if len(ks) < 8:
-            continue
-        c = normalize(np.mean([nodes[k]["vec"] for k in ks], axis=0, keepdims=True))[0]
-        sims = np.array([nodes[k]["vec"] @ c for k in ks])
-        centroid[sec] = c
-        lo_hi[sec] = tuple(np.percentile(sims, [10, 60]))
-    for k, node in nodes.items():
-        sec = node["section"]
-        if node["kind"] == 0 or sec not in centroid:
-            continue
-        v, c = node["vec"], centroid[sec]
-        sim = float(v @ c)
-        lo, hi = lo_hi[sec]
-        if sim >= hi or hi <= lo:
-            continue
-        pull = args.anchor * min(1.5, (hi - sim) / (hi - lo))
-        node["vec"] = normalize(((1 - pull) * v + pull * c)[None, :])[0]
-
 # ---------------------------------------------------------------- common words
 CONCRETE = {"noun.animal", "noun.food", "noun.artifact", "noun.body", "noun.plant", "noun.object", "noun.substance",
             "noun.location", "noun.person", "noun.natural_object", "noun.shape"}
@@ -251,6 +210,49 @@ print("common words:", len(common))
 for t in common:
     nodes[t] = dict(disp=t, vec=V_low[idx_of[t]], kind=0, rank=rank_of[t], toks=[t], section=category(t))
 
+# ---------------------------------------------------------------- anchor outlier vectors to their section
+# GloVe vectors are per surface-form and blend every sense of a token by how often each occurs in raw text. A
+# word's *intended* sense (Bosch the painter, not the auto-parts/appliance brand; myrtle the plant, not "Myrtle
+# Beach"; Slinky the toy, not the adjective) can be a minority use, so the vector still swims toward whatever
+# sense dominates in Common Crawl, which shows up as neighbours from a totally different world (Bosch <-> Roomba,
+# myrtle <-> sandcastle/resort, llama <-> karaoke). This affects curated proper nouns and ordinary common words
+# alike, so every node is grouped by its section - the curated category name for proper nouns, the WordNet
+# lexname (noun.plant, noun.animal, ...) for common words - and compared the same way.
+#
+# Most words are *not* like this - their raw vector already sits comfortably among their own section (Kraken's
+# vector is already core "mythical sea monster", which is exactly why it earns a genuinely good bridge to
+# Blackbeard). Pulling every word toward its section centroid indiscriminately was tried first and measurably hurt
+# overall navigability (evaluate.py's simulated-player solve rate dropped 10-25 points) by also dragging
+# well-placed words away from the legitimate cross-topic bridges they'd already found.
+#
+# So only outliers get corrected: for each section, find where a word's raw cosine similarity to its own section
+# centroid falls versus its section-mates (10th vs 60th percentile), and pull only the words below that range -
+# the ones a reader would call mislabeled - leaving everything already well-aligned untouched.
+if args.anchor:
+    from collections import defaultdict
+    by_section = defaultdict(list)
+    for k, node in nodes.items():
+        by_section[node["section"]].append(k)
+    centroid, lo_hi = {}, {}
+    for sec, ks in by_section.items():
+        if len(ks) < 8:
+            continue
+        c = normalize(np.mean([nodes[k]["vec"] for k in ks], axis=0, keepdims=True))[0]
+        sims = np.array([nodes[k]["vec"] @ c for k in ks])
+        centroid[sec] = c
+        lo_hi[sec] = tuple(np.percentile(sims, [10, 60]))
+    for k, node in nodes.items():
+        sec = node["section"]
+        if sec not in centroid:
+            continue
+        v, c = node["vec"], centroid[sec]
+        sim = float(v @ c)
+        lo, hi = lo_hi[sec]
+        if sim >= hi or hi <= lo:
+            continue
+        pull = args.anchor * min(1.5, (hi - sim) / (hi - lo))
+        node["vec"] = normalize(((1 - pull) * v + pull * c)[None, :])[0]
+
 keys = list(nodes.keys())
 words = [nodes[k]["disp"] for k in keys]
 kinds = np.array([nodes[k]["kind"] for k in keys])
@@ -263,6 +265,8 @@ lows = [k for k in keys]
 def related_forms(i, j):
     a, b = lows[i], lows[j]
     if a == b:
+        return True
+    if frozenset((a, b)) in BANNED_PAIRS:
         return True
     if toksets[i] & toksets[j] and (kinds[i] != 0 or kinds[j] != 0):
         return True  # "ice cream" vs "ice"

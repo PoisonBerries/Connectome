@@ -62,6 +62,14 @@ copyright rights reserved
 ii iii iv vi vii viii ix xi xii
 """.split())
 
+# Specific pairs whose vectors sit close for no reason a player could ever guess (no shared theme, sense, or
+# category - just a stray corpus co-occurrence), found by manually reading through generated puzzle routes.
+# --anchor (see build.py) fixes this when it's a whole word swimming toward the wrong sense; these are the rarer
+# cases where the two words are each fine on their own but the *pair* has no discoverable logic even in hindsight.
+BANNED_PAIRS = {frozenset(p.split("-")) for p in """
+llama-karaoke
+""".split()}
+
 # Words that read as bland/abstract "hub" filler and make poor puzzle endpoints
 ABSTRACT_ENDPOINT_BLOCK = set("""
 thing things stuff way ways kind sort type types form forms part parts area areas level levels case cases fact facts

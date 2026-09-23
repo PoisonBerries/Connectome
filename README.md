@@ -128,14 +128,21 @@ Each endpoint also gets an *approachability* score (how often a simple navigator
 near-unreachable targets. Inflections and obvious relatives (dog/dogs, photo/photograph)
 are never offered as neighbours. Proper nouns come from a hand-curated list (`proper_nouns.txt`) rather than the
 news-heavy raw corpus, and profanity, slurs, and graphic-violence terms are excluded (`lexicon.py`).
-A raw GloVe vector for a curated proper noun blends *every* sense of that surface form by how often each occurs in
-Common Crawl text, so a minority sense (Bosch the painter) can lose out to a majority one (Bosch the auto-parts/
-appliance brand) and pull in nonsense neighbours (Roomba, a grinder). `--anchor` corrects only the outliers: for
-each curated word, if its raw vector sits unusually far from the average of its own curated section (below the
+A raw GloVe vector blends *every* sense of a surface form by how often each occurs in Common Crawl text, so a
+minority sense (Bosch the painter, myrtle the plant) can lose out to a majority one (Bosch the auto-parts/appliance
+brand, "Myrtle Beach") and pull in nonsense neighbours (Roomba, a grinder; sandcastle, resort). `--anchor` corrects
+only the outliers: every word is grouped by its section (a curated proper noun's category, or a common word's
+WordNet lexname), and if its raw vector sits unusually far from the average of its own section (below the
 section's 10th-60th percentile of similarity-to-centroid), it's pulled proportionally toward that average; words
 already sitting comfortably in their section (most of them) are left untouched so genuine cross-topic bridges
-survive. A flat pull on every curated word was tried first and fixed the same words, but indiscriminately dragging
-well-placed ones too cost 10-25 points of simulated solve rate in `evaluate.py`; the outlier-only version costs ~3.
+survive. A flat pull on every word was tried first and fixed the same cases, but indiscriminately dragging
+well-placed ones too cost 10-25 points of simulated solve rate in `evaluate.py`; the outlier-only version costs
+none - it's actually raised solve rate slightly, since the words it fixes were creating bad bridges elsewhere too.
+A handful of pairs have no shared theme even in hindsight (llama <-> karaoke) and aren't a single word swimming
+toward the wrong sense so much as a stray corpus coincidence between two otherwise-fine words; those are named
+directly in `lexicon.py`'s `BANNED_PAIRS` and never linked, found by manually reading generated puzzle routes.
+Every puzzle target also needs at least `MIN_TARGET_INDEGREE` (`puzzle_lib.py`) words that link straight to it, so
+the Gateways hint always has something to show and a target never reduces to one narrow route in.
 Endpoint words carry a **theme** (place, people, fiction, brand, food, animal, object, nature, ...). Puzzles and endless
 targets are drawn theme-first, and a start and target never share a theme, so there is no "Paris → Austria". Re-running
 `make_puzzles.py` keeps every already-published puzzle (through launch day) and only regenerates the future ones.

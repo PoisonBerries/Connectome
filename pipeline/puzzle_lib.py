@@ -6,6 +6,10 @@ from lexicon import ABSTRACT_ENDPOINT_BLOCK
 CONCRETE_CATS = {"noun.animal", "noun.food", "noun.artifact", "noun.plant", "noun.object", "noun.natural_object",
                  "noun.substance", "noun.body", "noun.person", "noun.location", "noun.shape"}
 
+# A puzzle target needs more than one door in: at in-degree 1 the Gateways hint has nothing to show and there's
+# effectively one route to the word, which reads as a dead end to funnel through rather than a real puzzle.
+MIN_TARGET_INDEGREE = 2
+
 # ambiguous / awkward as a puzzle endpoint (still fine as an in-between hop)
 ENDPOINT_EXCLUDE = set("""
 frost wells christie prince bolt wilde hood chan lee oscar hugo jordan georgia dakota carolina phoenix mercury orion
@@ -175,8 +179,11 @@ def picturable(w):
 
 
 def endpoint_pool(G):
+    indeg = np.bincount(G["nbrs"][:, :5].ravel(), minlength=G["n"])
     out = []
     for i, w in enumerate(G["words"]):
+        if indeg[i] < MIN_TARGET_INDEGREE:
+            continue
         lw = w.lower()
         if lw in ENDPOINT_EXCLUDE or lw in ABSTRACT_ENDPOINT_BLOCK:
             continue
