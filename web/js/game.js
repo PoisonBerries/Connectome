@@ -30,9 +30,15 @@ export class Game {
   get options() {
     return this.optionsAt(this.current);
   }
-  /** Where you can hop from a word: its five links, plus three more once plasticity has grown them. */
+  /**
+   * Where you can hop from a word: its five links, plus three more once plasticity has grown them.
+   * A word whose real top-5 just missed this puzzle's target (or one of its strongest gateways) has that
+   * near-miss spliced in here, evicting its weakest link(s) first - never more than the override itself sets.
+   */
   optionsAt(node) {
-    const base = this.world.neighbors(node);
+    const links = this.world.neighbors(node);
+    const extra = this.world.overridesAt(node, this.puzzle.target);
+    const base = extra.length ? [...links.slice(0, links.length - extra.length), ...extra] : links;
     return this.plasticityNodes.has(node) ? [...base, ...this.world.extras(node)] : base;
   }
   /** The three extra options plasticity has grown on the current word (empty until it is used). */

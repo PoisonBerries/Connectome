@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import shortest_path
-from lexicon import ABSTRACT_ENDPOINT_BLOCK
+from lexicon import ABSTRACT_ENDPOINT_BLOCK, BANNED_PAIRS
 
 CONCRETE_CATS = {"noun.animal", "noun.food", "noun.artifact", "noun.plant", "noun.object", "noun.natural_object",
                  "noun.substance", "noun.body", "noun.person", "noun.location", "noun.shape"}
@@ -211,3 +211,107 @@ def agent_moves(nb, cosrow, s, t, max_moves=80):
         j = t if t in cand else max(cand, key=lambda j: cosrow[j])
         visited.add(j); stack.append(j); cur = j; moves += 1
     return moves if cur == t else None
+
+
+def lexically_related(a, b):
+    """Cheap standalone echo of build.py's related_forms(), operating on word strings: blocks inflections and
+    near-duplicate spellings (Lego/Legos) from ever being offered as an override, same as real links."""
+    a, b = a.lower(), b.lower()
+    if a == b or frozenset((a, b)) in BANNED_PAIRS:
+        return True
+    if " " in a or " " in b:
+        return False
+    s, l = (a, b) if len(a) <= len(b) else (b, a)
+    if len(s) >= 4 and l.startswith(s):
+        return True
+    if len(s) >= 3 and l.endswith(s) and len(l) - len(s) <= 4 and len(s) >= 4:
+        return True
+    p = 0
+    while p < min(len(a), len(b)) and a[p] == b[p]:
+        p += 1
+    return p >= 6 or (p >= 5 and min(len(a), len(b)) <= 6)
+
+
+# Every target is topped up toward this many effective gateways (natural in-degree + layer-1 overrides) - not
+# pushed past it, so words that are already well-connected get left alone entirely.
+GATEWAY_GOAL = 8
+# For each of a target's strongest natural gateways, how many of *its* near-misses can extend the funnel one
+# hop further out. Small and fixed, since this is a secondary polish layer, not the thing closing the gap to
+# GATEWAY_GOAL.
+LAYER2_GATEWAYS = 3
+LAYER2_PER_GATEWAY = 3
+# A word may have at most this many of its original five links replaced by overrides, so a heavily-overridden
+# word never loses its own character entirely.
+MAX_EVICT = 2
+
+
+def compute_overrides(G, pool):
+    """For each pool word T (every word that can ever be a puzzle target), find words whose static top-5 just
+    missed T itself, or just missed one of T's strongest gateways (words that already link straight to T) - a
+    near-miss by raw similarity, not by the graph's own top-5-with-diversity cut. Those words get T (or the
+    gateway) spliced into their shown options for any puzzle where T is the actual target, evicting their
+    weakest original link(s) first. This never touches the graph other puzzles see.
+
+    Layer 1 only searches as far as needed to bring T up to GATEWAY_GOAL total gateways - a target that's
+    already well-connected gets nothing. Layer 2 is a small, fixed-size polish pass one hop further out, from
+    T's strongest few gateways only (not the layer-1 additions, which would compound into thousands of
+    barely-related splices).
+
+    Returns {str(target_id): [[word_id, extra_link_id], ...]}, only for targets that got at least one override.
+    """
+    vecs, nb, words = G["vecs"], G["nbrs"], G["words"]
+    n = len(words)
+    lower = [w.lower() for w in words]
+    static = [set(int(x) for x in row) for row in nb]
+    gateways_of = [[] for _ in range(n)]  # natural gateways: gateways_of[t] = words w with t in nb[w]
+    for w in range(n):
+        for t in nb[w]:
+            gateways_of[int(t)].append(w)
+
+    def near_misses(target_id, exclude, limit):
+        """Best `limit` words whose real top-5 just missed target_id, ranked by raw similarity to it."""
+        sims = vecs @ vecs[target_id]
+        tl = lower[target_id]
+        out = []
+        for w in np.argsort(-sims):
+            w = int(w)
+            if w == target_id:
+                continue
+            if w in exclude or target_id in static[w] or lexically_related(lower[w], tl):
+                continue
+            out.append((float(sims[w]), w))
+            if len(out) >= limit * 3:  # a little slack to survive dedup against other targets/gateways below
+                break
+        return out[:limit]
+
+    overrides = {}
+    for t in (int(x) for x in pool):
+        natural = gateways_of[t]
+        per_word = {}  # w -> list of (priority, extra_link) candidates
+        need = max(0, GATEWAY_GOAL - len(natural))
+        layer1 = near_misses(t, exclude=set(natural), limit=need) if need else []
+        for score, w in layer1:
+            per_word.setdefault(w, []).append((1000 + score, t))  # layer 1 always outranks layer 2
+
+        # layer 2: only from T's own strongest natural gateways, ranked by how similar they are to T
+        sims_t = vecs @ vecs[t]
+        strong_gateways = sorted(natural, key=lambda g: -sims_t[g])[:LAYER2_GATEWAYS]
+        for g in strong_gateways:
+            for score, w in near_misses(g, exclude={t, g}, limit=LAYER2_PER_GATEWAY):
+                per_word.setdefault(w, []).append((score, g))
+
+        pairs = []
+        for w, cands in per_word.items():
+            cands.sort(reverse=True)
+            picked, seen_x = [], set()
+            for _, x in cands:
+                if x in seen_x or x == w:
+                    continue
+                seen_x.add(x)
+                picked.append(x)
+                if len(picked) == MAX_EVICT:
+                    break
+            pairs.extend([w, x] for x in picked)
+        if pairs:
+            overrides[str(t)] = pairs
+    return overrides

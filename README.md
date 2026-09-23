@@ -142,7 +142,23 @@ A handful of pairs have no shared theme even in hindsight (llama <-> karaoke) an
 toward the wrong sense so much as a stray corpus coincidence between two otherwise-fine words; those are named
 directly in `lexicon.py`'s `BANNED_PAIRS` and never linked, found by manually reading generated puzzle routes.
 Every puzzle target also needs at least `MIN_TARGET_INDEGREE` (`puzzle_lib.py`) words that link straight to it, so
-the Gateways hint always has something to show and a target never reduces to one narrow route in.
+the Gateways hint always has something to show and a target never reduces to one narrow route in. Pushing that
+minimum higher across the board isn't possible without changing the graph itself: every word already makes exactly
+5 links, so the total edge count (and each word's odds of being one of anyone's five picks) is fixed regardless of
+tie-breaking heuristics like `--mutual` (a candidate's own reciprocity bonus, which plateaus almost immediately and
+barely moves in-degree at all - confirmed empirically, not assumed).
+
+Instead, `puzzle_lib.py`'s `compute_overrides()` tops up each target *per-puzzle* rather than reshaping the shared
+graph: for every pool word (anything that can ever be a target, in daily or endless - both draw from the same
+pool, so this needs no endless-specific code), it finds words whose real top-5 just missed that target by raw
+similarity, and splices the target into their shown options for any puzzle where it's actually the target -
+evicting up to 2 of the word's weakest original links to make room, and only searching as far as needed to bring
+a target up to `GATEWAY_GOAL` (8) total gateways, so already well-connected targets are left alone. A smaller,
+fixed second pass does the same one hop further out, from each target's strongest few natural gateways, so the
+approach to a target has better convergence too, not just the target itself. The result ships as a compact
+`{target: [[word, extra_link], ...]}` table in `graph.json`; the client (`Game.optionsAt`) looks it up by whichever
+puzzle is active, so the same word can show different options depending on what you're chasing - the graph itself
+never changes, only which of a word's near-misses get surfaced for the puzzle at hand.
 Endpoint words carry a **theme** (place, people, fiction, brand, food, animal, object, nature, ...). Puzzles and endless
 targets are drawn theme-first, and a start and target never share a theme, so there is no "Paris → Austria". Re-running
 `make_puzzles.py` keeps every already-published puzzle (through launch day) and only regenerates the future ones.

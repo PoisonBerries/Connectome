@@ -22,6 +22,21 @@ export class World {
     if (g.ea) this.pool.forEach((id, i) => this.approach.set(id, g.ea[i]));
     // three extra links per word (the next most related after its five), unlocked by the Plasticity hint
     this.extra = g.x ? Int32Array.from(g.x) : null;
+    // per-target near-miss splices: words whose real top-5 just missed this target (or one of its strongest
+    // gateways) get it spliced into their shown options whenever this word is the active puzzle's target.
+    // {targetId -> Map(wordId -> [extraLinkId, ...])}, built once so lookups during play are O(1).
+    this.overrides = new Map();
+    if (g.ov) {
+      for (const [t, pairs] of Object.entries(g.ov)) {
+        const byWord = new Map();
+        for (const [w, x] of pairs) {
+          const list = byWord.get(w) ?? [];
+          list.push(x);
+          byWord.set(w, list);
+        }
+        this.overrides.set(Number(t), byWord);
+      }
+    }
     this.kinds = g.k; // 0 word, 1 proper noun, 2 phrase
     this.out = Int32Array.from(g.n);
     this.N = this.words.length;
@@ -54,6 +69,11 @@ export class World {
   neighbors(i) {
     const o = this.out;
     return [o[i * K], o[i * K + 1], o[i * K + 2], o[i * K + 3], o[i * K + 4]];
+  }
+
+  /** Extra links (0-2) that should replace `node`'s weakest options when `target` is the active puzzle's target. */
+  overridesAt(node, target) {
+    return this.overrides.get(target)?.get(node) ?? [];
   }
 
   /** Directed distance from every node to `target` (Int16Array, -1 = unreachable). Cached. */
@@ -107,9 +127,14 @@ export class World {
     return path;
   }
 
-  /** Nodes that link directly to `target`. */
+  /** Nodes that link directly to `target`, including words a near-miss override now points at it too. */
   gateways(target) {
-    return this.inn[target].filter((n) => n !== target);
+    const natural = this.inn[target].filter((n) => n !== target);
+    const byWord = this.overrides.get(target);
+    if (!byWord) return natural;
+    const extra = [];
+    for (const [w, links] of byWord) if (links.includes(target)) extra.push(w);
+    return [...new Set([...natural, ...extra])];
   }
 
   puzzleFor(num) {

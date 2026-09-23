@@ -97,6 +97,33 @@ assert.equal(tierIndex(8, 5), 1); assert.equal(tierIndex(12, 8), 1); assert.equa
   assert(back.hasCompass(startWord) && back.penalty === 3 && !back.canUndo(), 'compass and spent undo survive save/restore');
 }
 
+// ---- target overrides: words whose real top-5 just missed a target get it spliced into their options
+{
+  let found = null;
+  outer: for (const [target, byWord] of w.overrides) {
+    for (const [word, extra] of byWord) {
+      if (extra.includes(target)) { found = { target, word, extra }; break outer; } // a direct-to-target case
+    }
+  }
+  assert(found, 'the shipped graph has at least one direct-to-target override to test against');
+  const { target, word, extra } = found;
+  const baseNeighbors = w.neighbors(word);
+  assert(extra.every((x) => !baseNeighbors.includes(x)), 'override links are not already among the real 5');
+
+  const g = new Game(w, { num: 999, start: word, target, min: w.distTo(target)[word], startLabel: '', targetLabel: '' });
+  assert(g.options.includes(target), `${w.words[word]}'s options include the target ${w.words[target]} it was overridden to reach`);
+  assert.equal(g.options.length, 5, 'the override replaces weak links rather than growing the option count');
+  assert(extra.every((x) => g.options.includes(x)), 'every override link for this word is present');
+  assert(w.gateways(target).includes(word), "a word overridden to reach the target directly also shows up in the target's Gateways hint");
+
+  const otherTarget = w.pool.find((t) => t !== target && t !== word && !w.overridesAt(word, t).length);
+  if (otherTarget !== undefined) {
+    const g2 = new Game(w, { num: 998, start: word, target: otherTarget, min: w.distTo(otherTarget)[word], startLabel: '', targetLabel: '' });
+    assert.deepEqual(g2.options, baseNeighbors, "a puzzle whose target has no override for this word shows the word's real neighbors");
+  }
+  console.log('target override checks passed');
+}
+
 console.log('date of #1:', dateOfPuzzle(w, 1).toDateString(), '| today is #', todayNumber(w));
 console.log('all game logic checks passed');
 
@@ -213,6 +240,23 @@ console.log('all game logic checks passed');
     assert(e.game.canUndo(), 'undo is usable again in round 2');
     assert(e.game.compass(), 'compass is usable again in round 2');
     console.log('single-use hint/undo round-reset checks passed');
+  }
+
+  // target overrides need no endless-specific code: every round is an ordinary Game sharing the same World,
+  // so whatever override applies to a rolled target's start word shows up in that round's options too
+  {
+    let checked = false;
+    for (let n = 0; n < 200 && !checked; n++) {
+      const e = new EndlessRun(w, { rand });
+      assert(e.game instanceof Game, 'endless rounds use the same Game class as daily');
+      const ov = w.overridesAt(e.game.current, e.game.puzzle.target);
+      if (ov.length) {
+        assert(ov.every((x) => e.game.options.includes(x)), "the rolled round's start word shows its override exactly like daily would");
+        checked = true;
+      }
+    }
+    assert(checked, 'at least one of 200 rolled endless rounds should exercise a real override');
+    console.log('endless target-override checks passed');
   }
 
   // save / restore, including mid-celebration

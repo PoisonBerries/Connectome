@@ -11,7 +11,7 @@ import datetime as dt
 import numpy as np
 from scipy.sparse.csgraph import shortest_path
 
-from puzzle_lib import load, adjacency, endpoint_pool, agent_moves, theme_of
+from puzzle_lib import load, adjacency, endpoint_pool, agent_moves, theme_of, compute_overrides
 from common import HERE
 
 EPOCH = dt.date(2026, 9, 21)  # launch day (a Monday); archive puzzles run back from here
@@ -49,6 +49,11 @@ n = G["n"]
 A = adjacency(nb)
 pool = endpoint_pool(G)
 print("endpoint pool:", len(pool))
+
+overrides = compute_overrides(G, pool)
+override_words = {w for pairs in overrides.values() for w, _ in pairs}
+print(f"target overrides: {len(overrides)} targets, {sum(len(v) for v in overrides.values())} total splices, "
+      f"{len(override_words)} distinct words affected")
 
 D = shortest_path(A, method="D", unweighted=True, indices=pool)[:, pool]
 C = vecs[pool] @ vecs[pool].T
@@ -174,7 +179,8 @@ out_graph = dict(w=words, k=[int(x) for x in kinds], n=[int(x) for x in nb.ravel
                  x=[int(v) for v in G["extras"].ravel()],  # 3 extra 'plasticity' links per word
                  e=[int(x) for x in pool],  # well-known endpoint words: the pool endless mode draws from
                  eg=[theme_names.index(t) for t in themes], gn=theme_names,
-                 ea=[int(x) for x in approach])  # each endpoint's theme, for variety
+                 ea=[int(x) for x in approach],  # each endpoint's theme, for variety
+                 ov=overrides)  # per-target near-miss splices: {target_id: [[word_id, extra_link_id], ...]}
 with open(os.path.join(WEB, "graph.json"), "w") as f:
     json.dump(out_graph, f, separators=(",", ":"))
 out_p = dict(epoch=EPOCH_OUT.isoformat(),
