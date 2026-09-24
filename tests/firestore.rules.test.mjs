@@ -139,7 +139,6 @@ try {
   ok('a denylisted combo is refused even though it is a well-formed 3 characters', await fails(setDoc(lb, list(entry({ initials: 'ASS' })))));
   ok('a digit-substituted denylisted combo is also refused', await fails(setDoc(lb, list(entry({ initials: 'A55' })))));
   ok('links out of range is refused', await fails(setDoc(lb, list(entry({ links: 0 })))));
-  ok('links above the plausibility cap is refused', await fails(setDoc(lb, list(entry({ links: 501 })))));
   ok('hops less than links is refused', await fails(setDoc(lb, list(entry({ links: 10, hops: 5 })))));
   ok('an unsorted list (not descending by links) is refused', await fails(setDoc(lb, list(entry({ initials: 'AAA', links: 5 }), entry({ initials: 'BBB', links: 10 })))));
   ok('a signed-in user can create the first-ever leaderboard', await succeeds(setDoc(lb, list(entry()))));

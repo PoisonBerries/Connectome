@@ -70,10 +70,15 @@ service cloud.firestore {
         && !s.matches('^(ASS|A55|4SS|FAG|F4G|CUM|CVM|TIT|T1T|SOB|FUK|FCK|PHK|SHT|SH1|DIK|DIC|JIZ|CNT|KKK'
           + '|NIG|N1G|SEX|S3X|HOE|H0E|SLT|PIS|PSS|TWA|COK|C0K|COC|BJS|PRK|RTA|FUC|WOP|GOK|SPC|KYK|CHK|NGR)$');
     }
+    // The upper plausibility caps (links/hops can't be absurdly large) were dropped, not just links<=500 - an
+    // *update* (the real-world path, once the doc exists at all) does strictly more work than a fresh create,
+    // and a full 10-entry list was still tipping over the rules engine's per-request evaluation budget with them
+    // in place. They were only a soft sanity bound anyway (this file's threat model already accepts that nothing
+    // here verifies a chain was genuinely played) - not worth a broken leaderboard to keep.
     function validLbEntry(e) {
       return e.initials is string && isCleanInitials(e.initials)
-        && e.links is int && e.links >= 1 && e.links <= 500
-        && e.hops is int && e.hops >= e.links && e.hops <= 6000;
+        && e.links is int && e.links >= 1
+        && e.hops is int && e.hops >= e.links;
     }
     // Both helpers treat "index doesn't exist in this list" as vacuously fine, so a shorter-than-10 list only
     // ever gets checked at the indices it actually has.
