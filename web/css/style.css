@@ -466,6 +466,8 @@ main { flex: 1; display: flex; flex-direction: column; gap: 10px; min-height: 0;
 .ctl:active:not(:disabled) { transform: scale(0.96); }
 .ctl:disabled { opacity: 0.35; cursor: default; }
 .controls.over { grid-template-columns: 1fr; }
+.controls.endless-done { grid-template-columns: 1fr 1fr; }
+.controls.endless-done #btn-results { grid-column: 1 / -1; }
 .btn.wide { width: 100%; min-height: 50px; }
 .ctl.on { color: var(--warn); border-color: rgba(255, 209, 102, 0.5); }
 

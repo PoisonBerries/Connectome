@@ -199,7 +199,10 @@ function renderHud() {
   $('btn-hint').classList.toggle('on', g.hintsUsed > 0 && !done);
   $('btn-hint').querySelector('span').textContent = g.hintsUsed ? `Hint · ${g.hintsUsed}` : 'Hint';
   document.querySelector('.controls').classList.toggle('over', done);
+  document.querySelector('.controls').classList.toggle('endless-done', endless && done);
   $('btn-results').hidden = !done;
+  $('btn-quick-again').hidden = !(endless && done);
+  $('btn-quick-board').hidden = !(endless && done);
   for (const id of ['btn-undo', 'btn-hint', 'btn-map', 'btn-giveup', 'btn-reroll']) $(id).hidden = done;
   // gently point finished daily players at endless mode until they've tried it
   $('modes').classList.toggle('nudge', !endless && g.over && !state.settings.seenEndless);
@@ -224,7 +227,15 @@ function renderTrail() {
     parts.push('<span class="sep dim"></span>', `<span class="chip goal">${esc(w[g.puzzle.target])}</span>`);
   }
   el.innerHTML = parts.join('');
-  el.scrollTo({ left: el.scrollWidth, behavior: state.settings.motion ? 'smooth' : 'auto' });
+  // Scrolling all the way to scrollWidth routinely lands mid-chip (the fade mask dims it, but doesn't hide it),
+  // slicing a word in half at the left edge. Snap back to the nearest chip/separator boundary at or before that
+  // point instead, so the auto-scroll never leaves a chip visibly cut off.
+  const max = el.scrollWidth - el.clientWidth;
+  let target = max;
+  if (max > 0) {
+    for (const child of el.children) if (child.offsetLeft <= max) target = child.offsetLeft;
+  }
+  el.scrollTo({ left: target, behavior: state.settings.motion ? 'smooth' : 'auto' });
 }
 
 function announce() {
@@ -860,6 +871,14 @@ function wireEvents() {
     openDialog('dlg-giveup');
   };
   $('btn-results').onclick = () => (state.mode === 'endless' ? openEndlessOver() : finish({ show: true }));
+  // The run is already recorded by the time these show (runOver() does that before the results screen even
+  // opens), so both quick actions are safe to fire directly from the main screen with nothing to lose.
+  $('btn-quick-again').onclick = newEndlessRun;
+  $('btn-quick-board').onclick = async () => {
+    const entries = await fetchLeaderboard();
+    if (entries) openLeaderboardDialog(entries);
+    else toast("Couldn't load the leaderboard");
+  };
 
   $('mode-daily').onclick = () => state.mode !== 'daily' && backToDaily();
   $('mode-endless').onclick = () => state.mode !== 'endless' && enterEndless();
