@@ -62,8 +62,11 @@ service cloud.firestore {
     // letter substitutions) that fit in 3 characters - not a claim of completeness, and not meant to be the only
     // check: web/js/initials.js has the identical list and is what the client checks before ever attempting a
     // write. If one changes, update the other to match.
+    // Assumes `s` is already known to be a string (checked once by the caller) - skipping a repeated `is string`
+    // check here is one of a handful of small cost trims needed to fit validating a 10-entry list under the
+    // rules engine's evaluation budget (see validLbEntry/lbEntryOk/lbSortedOk below for the others).
     function isCleanInitials(s) {
-      return s is string && s.matches('^[A-Z0-9]{3}$')
+      return s.matches('^[A-Z0-9]{3}$')
         && !s.matches('^(ASS|A55|4SS|FAG|F4G|CUM|CVM|TIT|T1T|SOB|FUK|FCK|PHK|SHT|SH1|DIK|DIC|JIZ|CNT|KKK'
           + '|NIG|N1G|SEX|S3X|HOE|H0E|SLT|PIS|PSS|TWA|COK|C0K|COC|BJS|PRK|RTA|FUC|WOP|GOK|SPC|KYK|CHK|NGR)$');
     }
