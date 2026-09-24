@@ -185,6 +185,35 @@ try {
   }
   ok('reproduction: the exact reported update should succeed', reproPassed);
 
+  // ---- bisection: is the size-7 shape itself invalid (a bug in isValidLeaderboard/lbEntryOk/lbSortedOk), or is
+  // it specifically the update-vs-existing-doc comparison? Clear the doc entirely and try the same 7-entry list
+  // as a fresh CREATE, which never touches the update-only regression check at all.
+  await env.clearFirestore();
+  let bisectPassed = true;
+  try {
+    await setDoc(lb, reportedAfter);
+  } catch (e) {
+    bisectPassed = false;
+    console.log('bisection (fresh create) rejection reason:', e && e.message);
+  }
+  ok('bisection: the same 7-entry list as a brand-new create should succeed', bisectPassed);
+
+  // ---- finer bisection: find the exact list size where a plain, tie-free, strictly-descending list stops being
+  // accepted as a fresh create, to separate "size" from "ties" as the variable.
+  for (let size = 1; size <= 8; size++) {
+    await env.clearFirestore();
+    const links = Array.from({ length: size }, (_, i) => 20 - i * 2); // strictly descending, no ties
+    const bisectList = { entries: links.map((n, i) => ({ initials: 'A' + String.fromCharCode(65 + i) + 'A', links: n, hops: n + 5 })) };
+    let sizePassed = true;
+    try {
+      await setDoc(lb, bisectList);
+    } catch (e) {
+      sizePassed = false;
+      console.log(`bisection size=${size} rejection reason:`, e && e.message);
+    }
+    ok(`bisection: a tie-free size-${size} create should succeed`, sizePassed);
+  }
+
   ok('deleting the leaderboard is always refused', await fails(deleteDoc(lb)));
   ok('reading the leaderboard while signed out is refused', await fails(getDoc(lbAnon)));
 
