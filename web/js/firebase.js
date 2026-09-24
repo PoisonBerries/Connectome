@@ -228,7 +228,14 @@ export async function submitToLeaderboard(initials, links, hops) {
     await withTimeout(fsMod.setDoc(ref, { entries: merged }));
   } catch (e) {
     console.warn('[connectome] could not submit to the leaderboard:', e && e.message);
-    return { ok: false, reason: 'error', message: e && e.message }; // TEMP diagnostic, see submitInitials()
+    // TEMP diagnostic, see submitInitials(): existed tells us create vs. update; sent is the exact entry shape/types.
+    return {
+      ok: false,
+      reason: 'error',
+      message: e && e.message,
+      existed: before.exists(),
+      sent: merged.map((x) => `${x.initials}:${x.links}(${typeof x.links}):${x.hops}(${typeof x.hops})`),
+    };
   }
   return { ok: true, entries: merged, rank };
 }
