@@ -645,11 +645,7 @@ async function loadLeaderboard(run) {
     if (state.run !== run || !$('dlg-endless-over').open) return;
     if (!result.ok) {
       if (result.reason === 'error') {
-        // TEMP diagnostic: shows the raw Firebase error plus the exact submitted shape, to see why real submits
-        // are failing in production. Revert to a plain friendly message once the cause's found.
-        $('eo-initials-err').textContent =
-          `Couldn't submit — check your connection and try again. (${result.message || 'no error message'} | ` +
-          `existed:${result.existed} | sent:${JSON.stringify(result.sent)})`;
+        $('eo-initials-err').textContent = "Couldn't submit — check your connection and try again.";
         $('eo-initials-go').disabled = false;
         input.disabled = false;
       } else {

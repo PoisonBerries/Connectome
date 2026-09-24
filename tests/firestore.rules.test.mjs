@@ -150,69 +150,13 @@ try {
   ok('an update that raises #1 succeeds', await succeeds(setDoc(lbBob, list(entry({ initials: 'WOW', links: 15, hops: 60 }), entry(), entry({ initials: 'ZZZ', links: 3, hops: 10 })))));
   ok('the leaderboard now reflects the raised #1', (await getDoc(lb)).data().entries[0].links === 15);
 
-  // ---- reproduces a real-world production failure report: a 7-entry list with ties across several initials,
-  // adding a new #1, was rejected with "missing or insufficient permissions" despite looking well-formed and
-  // non-regressing by hand. Seed the exact reported "before" state (bypassing rules) and retry the exact "after".
-  await env.withSecurityRulesDisabled(async (ctx) => {
-    await setDoc(doc(ctx.firestore(), 'leaderboard/top10'), {
-      entries: [
-        { initials: 'JCS', links: 8, hops: 105 },
-        { initials: 'SUP', links: 6, hops: 70 },
-        { initials: 'JCS', links: 6, hops: 54 },
-        { initials: 'JCS', links: 5, hops: 48 },
-        { initials: 'JCS', links: 5, hops: 74 },
-        { initials: 'HII', links: 5, hops: 74 },
-      ],
-    });
-  });
-  const reportedAfter = {
-    entries: [
-      { initials: 'JCS', links: 9, hops: 111 },
-      { initials: 'JCS', links: 8, hops: 105 },
-      { initials: 'SUP', links: 6, hops: 70 },
-      { initials: 'JCS', links: 6, hops: 54 },
-      { initials: 'JCS', links: 5, hops: 48 },
-      { initials: 'JCS', links: 5, hops: 74 },
-      { initials: 'HII', links: 5, hops: 74 },
-    ],
-  };
-  let reproPassed = true;
-  try {
-    await setDoc(lb, reportedAfter);
-  } catch (e) {
-    reproPassed = false;
-    console.log('reproduction rejection reason:', e && e.message);
-  }
-  ok('reproduction: the exact reported update should succeed', reproPassed);
-
-  // ---- bisection: is the size-7 shape itself invalid (a bug in isValidLeaderboard/lbEntryOk/lbSortedOk), or is
-  // it specifically the update-vs-existing-doc comparison? Clear the doc entirely and try the same 7-entry list
-  // as a fresh CREATE, which never touches the update-only regression check at all.
-  await env.clearFirestore();
-  let bisectPassed = true;
-  try {
-    await setDoc(lb, reportedAfter);
-  } catch (e) {
-    bisectPassed = false;
-    console.log('bisection (fresh create) rejection reason:', e && e.message);
-  }
-  ok('bisection: the same 7-entry list as a brand-new create should succeed', bisectPassed);
-
-  // ---- finer bisection: find the exact list size where a plain, tie-free, strictly-descending list stops being
-  // accepted as a fresh create, to separate "size" from "ties" as the variable.
-  for (let size = 1; size <= 10; size++) {
-    await env.clearFirestore();
-    const links = Array.from({ length: size }, (_, i) => 20 - i * 2); // strictly descending, no ties
-    const bisectList = { entries: links.map((n, i) => ({ initials: 'A' + String.fromCharCode(65 + i) + 'A', links: n, hops: n + 5 })) };
-    let sizePassed = true;
-    try {
-      await setDoc(lb, bisectList);
-    } catch (e) {
-      sizePassed = false;
-      console.log(`bisection size=${size} rejection reason:`, e && e.message);
-    }
-    ok(`bisection: a tie-free size-${size} create should succeed`, sizePassed);
-  }
+  // Regression coverage for a real production bug: isCleanInitials's per-entry validation cost was high enough
+  // that any list of 7+ entries got silently rejected as PERMISSION_DENIED, capping the leaderboard at 6 entries
+  // no matter what a submission looked like. A full 10-entry list (the actual max, with a couple of ties) must
+  // be accepted, or that regression is back.
+  ok('a full 10-entry leaderboard (with ties) is accepted', await succeeds(setDoc(lbBob, list(
+    ...Array.from({ length: 10 }, (_, i) => entry({ initials: 'A' + String.fromCharCode(65 + i) + 'A', links: 20 - Math.floor(i / 2), hops: 25 - i }))
+  ))));
 
   ok('deleting the leaderboard is always refused', await fails(deleteDoc(lb)));
   ok('reading the leaderboard while signed out is refused', await fails(getDoc(lbAnon)));
