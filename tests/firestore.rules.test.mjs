@@ -149,6 +149,42 @@ try {
     await succeeds(setDoc(lbBob, list(entry(), entry({ initials: 'ZZZ', links: 3, hops: 10 })))));
   ok('an update that raises #1 succeeds', await succeeds(setDoc(lbBob, list(entry({ initials: 'WOW', links: 15, hops: 60 }), entry(), entry({ initials: 'ZZZ', links: 3, hops: 10 })))));
   ok('the leaderboard now reflects the raised #1', (await getDoc(lb)).data().entries[0].links === 15);
+
+  // ---- reproduces a real-world production failure report: a 7-entry list with ties across several initials,
+  // adding a new #1, was rejected with "missing or insufficient permissions" despite looking well-formed and
+  // non-regressing by hand. Seed the exact reported "before" state (bypassing rules) and retry the exact "after".
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'leaderboard/top10'), {
+      entries: [
+        { initials: 'JCS', links: 8, hops: 105 },
+        { initials: 'SUP', links: 6, hops: 70 },
+        { initials: 'JCS', links: 6, hops: 54 },
+        { initials: 'JCS', links: 5, hops: 48 },
+        { initials: 'JCS', links: 5, hops: 74 },
+        { initials: 'HII', links: 5, hops: 74 },
+      ],
+    });
+  });
+  const reportedAfter = {
+    entries: [
+      { initials: 'JCS', links: 9, hops: 111 },
+      { initials: 'JCS', links: 8, hops: 105 },
+      { initials: 'SUP', links: 6, hops: 70 },
+      { initials: 'JCS', links: 6, hops: 54 },
+      { initials: 'JCS', links: 5, hops: 48 },
+      { initials: 'JCS', links: 5, hops: 74 },
+      { initials: 'HII', links: 5, hops: 74 },
+    ],
+  };
+  let reproPassed = true;
+  try {
+    await setDoc(lb, reportedAfter);
+  } catch (e) {
+    reproPassed = false;
+    console.log('reproduction rejection reason:', e && e.message);
+  }
+  ok('reproduction: the exact reported update should succeed', reproPassed);
+
   ok('deleting the leaderboard is always refused', await fails(deleteDoc(lb)));
   ok('reading the leaderboard while signed out is refused', await fails(getDoc(lbAnon)));
 
