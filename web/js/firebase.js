@@ -217,7 +217,7 @@ export async function submitToLeaderboard(initials, links, hops) {
     before = await withTimeout(fsMod.getDoc(ref));
   } catch (e) {
     console.warn('[connectome] could not load the leaderboard before submitting:', e && e.message);
-    return { ok: false, reason: 'error' };
+    return { ok: false, reason: 'error', message: e && e.message }; // TEMP diagnostic, see submitInitials()
   }
   const current = before.exists() && Array.isArray(before.data().entries) ? before.data().entries : [];
   const entry = { initials, links, hops };
@@ -228,7 +228,7 @@ export async function submitToLeaderboard(initials, links, hops) {
     await withTimeout(fsMod.setDoc(ref, { entries: merged }));
   } catch (e) {
     console.warn('[connectome] could not submit to the leaderboard:', e && e.message);
-    return { ok: false, reason: 'error' };
+    return { ok: false, reason: 'error', message: e && e.message }; // TEMP diagnostic, see submitInitials()
   }
   return { ok: true, entries: merged, rank };
 }
