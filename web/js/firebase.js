@@ -203,25 +203,32 @@ export async function fetchLeaderboard() {
  * Attempts to add {initials, links, hops} to the global top 10. Firestore has no atomic "insert into sorted
  * array", so this re-fetches the current list and merges against *that* rather than trusting whatever the caller
  * last saw — still not a transaction (see firestore.rules for what actually gets enforced either way), but it
- * narrows the window. Safe to call any time a run ends with enough links to plausibly qualify; coming back null
- * just means the list moved on since it was last checked, which is a normal outcome, not an error.
- * @returns {Promise<null|{entries:object[], rank:number}>} the resulting list and this entry's 1-based rank,
- *   or null if it didn't make the cut (or Firebase is unavailable).
+ * narrows the window. Safe to call any time a run ends with enough links to plausibly qualify.
+ * @returns {Promise<{ok:true, entries:object[], rank:number}|{ok:false, reason:'no-rank'|'error'}>}
+ *   `no-rank` means the list genuinely moved on since it was last checked (a normal outcome, e.g. another
+ *   player's better run beat it to the last spot); `error` means the read/write itself failed (offline, blocked,
+ *   stale/misconfigured rules) and is worth telling the player apart from a fair loss so they know to retry.
  */
 export async function submitToLeaderboard(initials, links, hops) {
+  let fsMod, db, ref, before;
   try {
-    const { fsMod, db } = await load();
-    const ref = fsMod.doc(db, 'leaderboard', 'top10');
-    const before = await withTimeout(fsMod.getDoc(ref));
-    const current = before.exists() && Array.isArray(before.data().entries) ? before.data().entries : [];
-    const entry = { initials, links, hops };
-    const merged = [...current, entry].sort((a, b) => b.links - a.links).slice(0, 10);
-    const rank = merged.indexOf(entry) + 1;
-    if (!rank) return null; // sorted out of the top 10 by ties/newer entries between fetch and here
+    ({ fsMod, db } = await load());
+    ref = fsMod.doc(db, 'leaderboard', 'top10');
+    before = await withTimeout(fsMod.getDoc(ref));
+  } catch (e) {
+    console.warn('[connectome] could not load the leaderboard before submitting:', e && e.message);
+    return { ok: false, reason: 'error' };
+  }
+  const current = before.exists() && Array.isArray(before.data().entries) ? before.data().entries : [];
+  const entry = { initials, links, hops };
+  const merged = [...current, entry].sort((a, b) => b.links - a.links).slice(0, 10);
+  const rank = merged.indexOf(entry) + 1;
+  if (!rank) return { ok: false, reason: 'no-rank' }; // sorted out of the top 10 by ties/newer entries between fetch and here
+  try {
     await withTimeout(fsMod.setDoc(ref, { entries: merged }));
-    return { entries: merged, rank };
   } catch (e) {
     console.warn('[connectome] could not submit to the leaderboard:', e && e.message);
-    return null;
+    return { ok: false, reason: 'error' };
   }
+  return { ok: true, entries: merged, rank };
 }

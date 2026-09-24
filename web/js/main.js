@@ -632,8 +632,14 @@ async function loadLeaderboard(run) {
     input.disabled = true;
     const result = await submitToLeaderboard(initials, run.links, run.totalHops);
     if (state.run !== run || !$('dlg-endless-over').open) return;
-    if (!result) {
-      $('eo-qualify').innerHTML = '<p class="lede">Someone else just took that spot — so close!</p>';
+    if (!result.ok) {
+      if (result.reason === 'error') {
+        $('eo-initials-err').textContent = "Couldn't submit — check your connection and try again.";
+        $('eo-initials-go').disabled = false;
+        input.disabled = false;
+      } else {
+        $('eo-qualify').innerHTML = '<p class="lede">Someone else just took that spot — so close!</p>';
+      }
       return;
     }
     run.lbSubmitted = true;
