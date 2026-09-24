@@ -63,13 +63,9 @@ service cloud.firestore {
     // check: web/js/initials.js has the identical list and is what the client checks before ever attempting a
     // write. If one changes, update the other to match.
     function isCleanInitials(s) {
-      return s is string && s.matches('^[A-Z0-9]{3}$') && !(s in [
-        'ASS', 'A55', '4SS', 'FAG', 'F4G', 'CUM', 'CVM', 'TIT', 'T1T', 'SOB',
-        'FUK', 'FCK', 'PHK', 'SHT', 'SH1', 'DIK', 'DIC', 'JIZ', 'CNT', 'KKK',
-        'NIG', 'N1G', 'SEX', 'S3X', 'HOE', 'H0E', 'SLT', 'PIS', 'PSS', 'TWA',
-        'COK', 'C0K', 'COC', 'BJS', 'PRK', 'RTA', 'FUC', 'WOP', 'GOK', 'SPC',
-        'KYK', 'CHK', 'NGR'
-      ]);
+      return s is string && s.matches('^[A-Z0-9]{3}$')
+        && !s.matches('^(ASS|A55|4SS|FAG|F4G|CUM|CVM|TIT|T1T|SOB|FUK|FCK|PHK|SHT|SH1|DIK|DIC|JIZ|CNT|KKK'
+          + '|NIG|N1G|SEX|S3X|HOE|H0E|SLT|PIS|PSS|TWA|COK|C0K|COC|BJS|PRK|RTA|FUC|WOP|GOK|SPC|KYK|CHK|NGR)$');
     }
     function validLbEntry(e) {
       return e.initials is string && isCleanInitials(e.initials)

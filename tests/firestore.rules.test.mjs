@@ -200,7 +200,7 @@ try {
 
   // ---- finer bisection: find the exact list size where a plain, tie-free, strictly-descending list stops being
   // accepted as a fresh create, to separate "size" from "ties" as the variable.
-  for (let size = 1; size <= 8; size++) {
+  for (let size = 1; size <= 10; size++) {
     await env.clearFirestore();
     const links = Array.from({ length: size }, (_, i) => 20 - i * 2); // strictly descending, no ties
     const bisectList = { entries: links.map((n, i) => ({ initials: 'A' + String.fromCharCode(65 + i) + 'A', links: n, hops: n + 5 })) };
